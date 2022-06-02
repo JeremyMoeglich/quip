@@ -1,16 +1,87 @@
-num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
-    int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+// Example code 
+//
+// fn get_current_ip(): Result<ip.Ip, TypeException<"Ip must be string"> | NetworkException<"Connection timed out" | "Not connected"> | FormatException<"Ip has wrong format"> | EnvError<"http request not available">> {
+//     response: Response = fetch('https://ip.moeglich.dev')?
+//     ip_string: JsonValue = json.parse(response.body)?
+//     if !(ip_string is string) {
+//         throw TypeException("Ip must be string")
+//     }
+//     ip: ip.Ip = ip.parse(ip_string)?
+//     return ip
+// }
 
-operation = _{ add | subtract | multiply | divide | power }
-    add      = { "+" }
-    subtract = { "-" }
-    multiply = { "*" }
-    divide   = { "/" }
-    power    = { "^" }
+code = _{ SOI ~ code_block ~ EOI }
 
-expr = { term ~ (operation ~ term)* }
-term = _{ num | "(" ~ expr ~ ")" }
+code_block = { (statement | "\n")* }
 
-calculation = _{ SOI ~ expr ~ EOI }
+
+statement = _{return_statement | assign | function | if_statement | while_statement | for_statement | scope }
+    return_statement = { "return" ~ expression? ~ ";"? }
+    assign = { typed_identifier ~ "=" ~ expression ~ ";"? }
+    function = { "fn" ~ identifier ~ "(" ~ parameter_list? ~ ")" ~ ("->" ~ type_definition)? ~ "{" ~ code_block ~ "}" }
+    if_statement = { start_if_statement ~ else_if_statement* ~ else_statement? }
+        start_if_statement = { "if" ~ "(" ~ expression ~ ")" ~ "{" ~ code_block ~ "}" }
+        else_if_statement = { "else" ~ "if" ~ "(" ~ expression ~ ")" ~ "{" ~ code_block ~ "}" }
+        else_statement = { "else" ~ "{" ~ code_block ~ "}" }
+    while_statement = { "while" ~ "(" ~ expression ~ ")" ~ "{" ~ code_block ~ "}" }
+    for_statement = { "for" ~ identifier ~ "in" ~ expression ~ "{" ~ code_block ~ "}" }
+    scope = { "{" ~ code_block ~ "}" }
+
+expression = { operation | range | section }
+    operation = { section ~ (operator ~ section)+ }
+    range = { section ~ ".." ~ section }
+
+section = _{ safe_section | call | index | unwrap | panic }
+    call = { safe_section ~ "(" ~ expression_list? ~ ")" }
+    spread = { "..." ~ expression }
+    array = { "[" ~ expression_list? ~ "]" }
+    set = { "{" ~ expression_list? ~ "}" }
+    index = { safe_section ~ ("[" ~ expression ~ "]")+ }
+    unwrap = { safe_section ~ unwrap_symbol+ }
+        unwrap_symbol = { "?" }
+    panic = { safe_section ~ panic_symbol+ }
+        panic_symbol = { "!?" }
+    ordering = { "(" ~ expression ~ ")" }
+
+safe_section = _{ literal | identifier | array | set | ordering | spread }
+
+operator = _{ add | sub | mul | div | modu | eq | neq | lt | lte | gt | gte | and | or | pow }
+    add = { "+" }
+    sub = { "-" }
+    mul = { "*" }
+    div = { "/" }
+    modu = { "%" }
+    eq = { "==" }
+    neq = { "!=" }
+    lt = { "<" }
+    lte = { "<=" }
+    gt = { ">" }
+    gte = { ">=" }
+    and = { "&&" }
+    or = { "||" }
+    pow = { "^" }
+
+
+expression_list = _{ (expression ~ ",")* ~ expression }
+parameter_list = _{ (typed_identifier ~ ",")* ~ typed_identifier }
+
+typed_identifier = { identifier ~ (":" ~ type_definition)? }
+
+type_definition = _{ identifier }
+
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+
+literal = _{ number | string | bool }
+    number = @{ int | float }
+        int = @{ (ASCII_DIGIT | "_")+ }
+        float = @{ (ASCII_DIGIT | "_")+ ~ "." ~ (ASCII_DIGIT | "_")+ }
+    string = @{ ("'" ~ ( "\\'" | (!"'" ~ ANY) )* ~ "'") } //| ('"' ~ ( '\\"' | (!"'" ~ ANY) )* ~ '"') 
+    bool = _{ true_bool | false_bool }
+        true_bool = @{ "true" }
+        false_bool = @{ "false" }
+
+
 
 WHITESPACE = _{ " " | "\t" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }

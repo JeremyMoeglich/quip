@@ -1,7 +1,6 @@
-extern crate pest;
-
-use crate::lexer::Token;
+use crate::pest_parser::{ASTParser, Rule};
 use num::bigint::BigInt;
+use pest::Parser;
 
 enum Statement {
     Return(Expression),
@@ -54,13 +53,8 @@ type Identifier = String;
 
 pub type CodeBlock = Vec<Statement>;
 
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-pub struct ASTParser;
-
-pub fn create_ast_from_lexer(lexer: logos::Lexer<Token>) -> CodeBlock {
-    let tokens = lexer.collect::<Vec<Token>>();
-    let ast = ASTParser::from(tokens);
+pub fn create_ast_from_content(content: &str) -> CodeBlock {
+    let ast = ASTParser::parse(Rule::code_block, content).unwrap_or_else(|e| panic!("{}", e));
 
     ast
 }
