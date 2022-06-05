@@ -1,0 +1,35 @@
+use std::str::FromStr;
+use num::bigint::BigInt;
+use ast::{}
+
+grammar;
+
+
+Operator1 = {
+    "*",
+    "/"
+}
+
+Operator2 = {
+    "+",
+    "-"
+}
+
+pub Expr = {
+    <Expr> <Operator2> <Term>
+    Factor
+}
+
+pub Factor = {
+    <Term> <Operator1> <Factor>
+    Term
+}
+
+pub Term = {
+    Num,
+    "(" <Expr> ")"
+}
+
+pub Num = {
+    r"[0-9]+" => BigInt::from_str(<>).unwrap()
+}

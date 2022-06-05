@@ -1,8 +1,8 @@
-use crate::pest_parser::{ASTParser, Rule};
+lalrpop_mod!(pub parser);
 use num::bigint::BigInt;
-use pest::Parser;
 
-enum Statement {
+#[derive(Debug)]
+pub enum Statement {
     Return(Expression),
     Assignment(TypedIdentifier, Expression),
     Function(Identifier, Vec<TypedIdentifier>, Box<CodeBlock>),
@@ -12,25 +12,37 @@ enum Statement {
     Scope(Box<CodeBlock>),
 }
 
-enum Expression {
-    Variable(Identifier),
+#[derive(Debug)]
+pub enum Expression {
     Literal(Literal),
-    Operation(Operator, Box<Expression>, Box<Expression>),
-    Call(Box<Expression>, Vec<Box<Expression>>),
+    Range(Box<Section>, Box<Section>),
+    Operation(Operation),
+}
+
+pub enum Operation {
+    Section(Section),
+    Operation(Box<Operation>, Operator, Box<Operation>),
+}
+
+pub enum Section {
     Unwrap(Box<Expression>),
     Panic(Box<Expression>),
     Range(Box<Expression>, Box<Expression>),
     Spread(Box<Expression>),
+    Call(Box<Expression>, Vec<Box<Expression>>),
+    Variable(Identifier),
 }
 
-enum Literal {
+#[derive(Debug)]
+pub enum Literal {
     Integer(BigInt),
     Float(f64),
     String(String),
     Boolean(bool),
 }
 
-enum Operator {
+#[derive(Debug)]
+pub enum Operator {
     Add,
     Sub,
     Mul,
@@ -47,14 +59,12 @@ enum Operator {
     Not,
 }
 
-type TypedIdentifier = (Identifier, Type);
-type Type = String;
-type Identifier = String;
-
+pub type TypedIdentifier = (Identifier, Type);
+pub type Type = String;
+pub type Identifier = String;
 pub type CodeBlock = Vec<Statement>;
 
-pub fn create_ast_from_content(content: &str) -> CodeBlock {
-    let ast = ASTParser::parse(Rule::code_block, content).unwrap_or_else(|e| panic!("{}", e));
-
-    ast
+pub fn astgen(content: &str) {
+    let x = parser::LiteralParser::new().parse(content).unwrap();
+    println!("{:?}", x);
 }
