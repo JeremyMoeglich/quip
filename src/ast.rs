@@ -1,7 +1,7 @@
-lalrpop_mod!(pub parser);
+#![allow(dead_code)]
 use num::bigint::BigInt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Return(Expression),
     Assignment(TypedIdentifier, Expression),
@@ -12,59 +12,64 @@ pub enum Statement {
     Scope(Box<CodeBlock>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Literal),
-    Range(Box<Section>, Box<Section>),
-    Operation(Operation),
-}
-
-pub enum Operation {
-    Section(Section),
-    Operation(Box<Operation>, Operator, Box<Operation>),
-}
-
-pub enum Section {
-    Unwrap(Box<Expression>),
-    Panic(Box<Expression>),
-    Range(Box<Expression>, Box<Expression>),
-    Spread(Box<Expression>),
-    Call(Box<Expression>, Vec<Box<Expression>>),
+    SingleOperation(SingleOperation, Box<Expression>),
+    Call(Box<Expression>, Vec<Expression>),
     Variable(Identifier),
+    Operation(Box<Expression>, Operator, Box<Expression>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SingleOperation {
+    Not,
+    ErrorUnwrap,
+    Panic,
+    Spread,
+    Unary,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Integer(BigInt),
     Float(f64),
-    String(String),
+    String(FancyString),
     Boolean(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum FancyStringFragment {
+    Expression(Expression),
+    LiteralString(String),
+    FormatPlaceholder,
+}
+
+pub type FancyString = Vec<FancyStringFragment>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operator {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    LessThan,
-    GreaterThan,
-    LessEqual,
-    GreaterEqual,
-    Equal,
-    NotEqual,
+    Range,
     And,
     Or,
-    Not,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessThanOrEquals,
+    GreaterThan,
+    GreaterThanOrEquals,
+    Coalesce,
+    Add,
+    Subtract,
+    Multiply,
+    IntDivide,
+    Divide,
+    Modulo,
+    Power,
+    Access,
 }
 
 pub type TypedIdentifier = (Identifier, Type);
 pub type Type = String;
 pub type Identifier = String;
 pub type CodeBlock = Vec<Statement>;
-
-pub fn astgen(content: &str) {
-    let x = parser::LiteralParser::new().parse(content).unwrap();
-    println!("{:?}", x);
-}

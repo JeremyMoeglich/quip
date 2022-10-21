@@ -2,16 +2,12 @@
 name = "lang_impl"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1"
-unicode-xid = "0"
 num = "0.4.0"
-lalrpop-util = { version = "0", features = ["lexer"] }
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm13-0"] }
-
-[build-dependencies]
-lalrpop = { version = "0", features = ["lexer"] }
+nom = "7.1.1"
+nom_locate = "4.0.0"
+nom-recursive = "0.4.0"
+lazy_static = "1.4.0"

@@ -1,8 +1,8 @@
-#[macro_use] extern crate lalrpop_util;
-
 mod ast;
+mod parser;
 
 fn main() {
-    let test_content = "(24444444444444444444444)";
-    ast::astgen(test_content);
+    let test_content = r#"((**))"#;
+    let expr = parser::simple_parse(test_content);
+    println!("{:#?}", expr);
 }

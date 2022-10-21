@@ -1,0 +1,58 @@
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{digit0, digit1},
+    combinator::opt,
+    sequence::tuple,
+    IResult,
+};
+
+use crate::parser::utils::Span;
+
+pub fn parse_float(input: Span) -> IResult<Span, f64> {
+    let (input, (left_digits, _, right_digits, exponent)) = tuple((
+        digit1,
+        tag("."),
+        digit0,
+        opt(tuple((
+            alt((tag("e"), tag("E"))),
+            opt(alt((tag("-"), tag("+")))),
+            digit1,
+        ))),
+    ))(input)?;
+    let mut value = format!("{}.{}", left_digits.fragment(), right_digits.fragment());
+    if let Some((_, sign, exponent)) = exponent {
+        let mut exponent = exponent.fragment().to_string();
+        if let Some(sign) = sign {
+            exponent = format!("{}{}", sign.fragment(), exponent);
+        }
+        value = format!("{}e{}", value, exponent);
+    }
+    Ok((
+        input,
+        value.parse().expect("Failed to parse float, parser bug"),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::utils::new_span;
+
+    use super::*;
+
+    fn test_fn(input: &str) -> Option<f64> {
+        match parse_float(new_span(input)) {
+            Ok((_, value)) => Some(value),
+            Err(_) => None,
+        }
+    }
+
+    #[test]
+    fn test_parse_float() {
+        assert_eq!(test_fn("23.4"), Some(23.4));
+        assert_eq!(test_fn("23.4e-2"), Some(23.4e-2));
+        assert_eq!(test_fn("23.4e+2"), Some(23.4e+2));
+        assert_eq!(test_fn("23.4e2"), Some(23.4e2));
+        assert_eq!(test_fn("23539.4235"), Some(23539.4235));
+    }
+}
