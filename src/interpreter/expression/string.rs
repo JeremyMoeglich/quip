@@ -10,9 +10,9 @@ pub fn interpret_string(string: FancyString, state: &mut ProgramState) -> Value 
         string
             .iter()
             .map(|string_part| match string_part {
-                FancyStringFragment::LiteralString(literal) => *literal,
+                FancyStringFragment::LiteralString(literal) => literal.clone(),
                 FancyStringFragment::Expression(expression) => {
-                    let value = interpret_expression(*expression, &mut state);
+                    let value = interpret_expression(expression.clone(), state);
                     match value {
                         Value::String(string) => string,
                         _ => panic!("Cannot convert {:?} to string", value),
