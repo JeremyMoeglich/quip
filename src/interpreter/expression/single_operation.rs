@@ -1,3 +1,5 @@
+use std::{rc::Rc, cell::RefCell};
+
 use crate::{
     ast::{Expression, SingleOperation},
     interpreter::state::{ProgramState, Value},
@@ -6,10 +8,10 @@ use crate::{
 use super::interpret_expression;
 
 pub fn interpret_single_operation(
-    (op, expr): (SingleOperation, Expression),
-    state: &mut ProgramState,
+    (op, expr): (&SingleOperation, &Expression),
+    state: &ProgramState,
 ) -> Value {
-    let expr = interpret_expression(expr, state);
+    let expr = interpret_expression(&expr, state);
     match op {
         SingleOperation::Negate => match expr {
             Value::Integer(i) => Value::Integer(-i),

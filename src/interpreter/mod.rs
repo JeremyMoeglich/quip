@@ -1,15 +1,17 @@
 mod code_block;
-mod state;
-mod statement;
-mod function;
 mod expression;
+mod function;
+pub mod state;
+mod statement;
 
-use crate::ast::{CodeBlock};
+use std::{cell::RefCell, rc::Rc};
 
-use self::{state::ProgramState, code_block::interpret_code_block};
+use crate::ast::CodeBlock;
 
-pub fn interpret_ast(block: CodeBlock) {
-    let mut state = ProgramState::new();
-    let state = interpret_code_block(block, &mut state);
-    println!("Final state: {:#?}", state);
+use self::{code_block::interpret_code_block, state::ProgramState};
+
+pub fn interpret_ast(block: CodeBlock) -> Rc<RefCell<ProgramState>> {
+    let mut state = Rc::new(RefCell::new(ProgramState::new()));
+    state = interpret_code_block(&block, state).1;
+    state
 }

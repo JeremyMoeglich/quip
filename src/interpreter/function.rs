@@ -1,28 +1,44 @@
+use std::{
+    cell::RefCell,
+    fmt::{Debug, Formatter},
+    rc::Rc,
+};
+
 use crate::ast::CodeBlock;
 
-use super::{state::{Value, ProgramState}, code_block::interpret_code_block};
+use super::{
+    code_block::interpret_code_block,
+    state::{ProgramState, Value},
+};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     pub name: String,
     pub parameters: Vec<String>,
     pub body: CodeBlock,
+    pub outer_state: &ProgramState,
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // don't print state as it might be circular
+        f.debug_struct("Function")
+            .field("name", &self.name)
+            .field("parameters", &self.parameters)
+            //.field("body", &self.body)
+            .finish()
+    }
 }
 
 impl Function {
-    pub fn new(name: String, parameters: Vec<String>, body: CodeBlock) -> Self {
-        Self {
-            name,
-            parameters,
-            body,
+    pub fn call(&self, arguments: Vec<Value>) -> Value {
+        let mut state = (*self.outer_state).borrow().clone();
+        if arguments.len() != self.parameters.len() {
+            panic!("Argument and Parameter length should be the same")
         }
-    }
-
-    pub fn call(&self, arguments: Vec<Value>, state: &mut ProgramState) -> Value {
-        let mut state = state;
-        for (parameter, argument) in self.parameters.iter().zip(arguments) {
-            state.variables.insert(parameter.clone(), argument);
+        for (argument_name, argument_value) in self.parameters.iter().zip(arguments) {
+            state.set_variable(argument_name, argument_value);
         }
-        interpret_code_block(self.body.clone(), state)
+        interpret_code_block(&self.body, Rc::new(RefCell::new(state))).0
     }
 }

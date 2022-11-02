@@ -5,14 +5,17 @@ use crate::{
 
 use super::interpret_expression;
 
-pub fn interpret_call((func, args): (Expression, Vec<Expression>), state: &mut ProgramState) -> Value {
+pub fn interpret_call(
+    (func, args): (&Expression, &Vec<Expression>),
+    state: &ProgramState,
+) -> Value {
     let mut arguments = Vec::new();
     for arg in args {
         arguments.push(interpret_expression(arg, state));
     }
     let function = interpret_expression(func, state);
     match function {
-        Value::Function(function) => function.call(arguments, state),
+        Value::Function(function) => function.call(arguments),
         _ => panic!("Cannot call {:?} as a function", function),
     }
 }
