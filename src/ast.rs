@@ -4,12 +4,14 @@ use num::bigint::BigInt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Return(Expression),
-    Assignment(TypedIdentifier, Expression),
-    Function(Identifier, Vec<TypedIdentifier>, Box<CodeBlock>),
-    If(Vec<(Expression, Box<CodeBlock>)>, Option<Box<CodeBlock>>),
-    While(Expression, Box<CodeBlock>),
-    For(TypedIdentifier, Expression, Box<CodeBlock>),
-    Scope(Box<CodeBlock>),
+    Assignment(Identifier, Expression),
+    Declaration(TypedIdentifier, Mutable, Option<Expression>),
+    Function(Identifier, Vec<TypedIdentifier>, CodeBlock),
+    If(Expression, CodeBlock, CodeBlock),
+    While(Expression, CodeBlock),
+    For(TypedIdentifier, Expression, CodeBlock),
+    Scope(CodeBlock),
+    Expression(Expression),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +29,8 @@ pub enum SingleOperation {
     ErrorUnwrap,
     Panic,
     Spread,
-    Unary,
+    Negate,
+    Positive,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +39,7 @@ pub enum Literal {
     Float(f64),
     String(FancyString),
     Boolean(bool),
+    None,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,3 +77,4 @@ pub type TypedIdentifier = (Identifier, Type);
 pub type Type = String;
 pub type Identifier = String;
 pub type CodeBlock = Vec<Statement>;
+pub type Mutable = bool;

@@ -11,14 +11,13 @@ use nom::{
 };
 
 use nom_locate::LocatedSpan;
-use nom_recursive::RecursiveInfo;
 
 // Utils for parsing
 
-pub type Span<'a> = LocatedSpan<&'a str, RecursiveInfo>;
+pub type Span<'a> = LocatedSpan<&'a str>;
 
 pub fn new_span(input: &str) -> Span {
-    Span::new_extra(input, RecursiveInfo::default())
+    Span::new_extra(input, ())
 }
 
 fn single_line_comment(input: Span) -> IResult<Span, Span> {

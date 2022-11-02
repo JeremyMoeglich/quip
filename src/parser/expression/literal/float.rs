@@ -42,7 +42,10 @@ mod tests {
 
     fn test_fn(input: &str) -> Option<f64> {
         match parse_float(new_span(input)) {
-            Ok((_, value)) => Some(value),
+            Ok((input2, value)) => match input2.fragment().is_empty() {
+                true => Some(value),
+                false => None,
+            },
             Err(_) => None,
         }
     }
@@ -54,5 +57,7 @@ mod tests {
         assert_eq!(test_fn("23.4e+2"), Some(23.4e+2));
         assert_eq!(test_fn("23.4e2"), Some(23.4e2));
         assert_eq!(test_fn("23539.4235"), Some(23539.4235));
+        assert_eq!(test_fn("32,4"), None);
+        assert_eq!(test_fn("32.4.5"), None);
     }
 }
