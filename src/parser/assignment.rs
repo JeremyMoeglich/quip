@@ -1,6 +1,6 @@
 use nom::{bytes::complete::tag, IResult};
 
-use crate::ast::{Statement};
+use crate::ast::Statement;
 
 use super::{
     expression::parse_expression,
@@ -14,8 +14,5 @@ pub fn parse_assignment(input: Span) -> IResult<Span, Statement> {
     let (input, _) = tag("=")(input)?;
     let (input, _) = ws(input)?;
     let (input, expression) = parse_expression(input)?;
-    Ok((
-        input,
-        Statement::Assignment(name, expression),
-    ))
+    Ok((input, Statement::Assignment(name, expression)))
 }

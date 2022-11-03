@@ -29,8 +29,5 @@ pub fn parse_function(input: Span) -> IResult<Span, Statement> {
         .iter()
         .map(|param| (param.clone(), "some_empty_type".to_string()))
         .collect();
-    Ok((
-        input,
-        Statement::Function(name, typed_params, code),
-    ))
+    Ok((input, Statement::Function(name, typed_params, code)))
 }

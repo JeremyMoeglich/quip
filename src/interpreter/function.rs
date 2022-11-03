@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    fmt::{Debug, Formatter},
-    rc::Rc,
-};
+use std::fmt::{Debug, Formatter};
 
 use crate::ast::CodeBlock;
 
@@ -16,7 +12,7 @@ pub struct Function {
     pub name: String,
     pub parameters: Vec<String>,
     pub body: CodeBlock,
-    pub outer_state: &ProgramState,
+    pub outer_state: ProgramState,
 }
 
 impl Debug for Function {
@@ -25,20 +21,21 @@ impl Debug for Function {
         f.debug_struct("Function")
             .field("name", &self.name)
             .field("parameters", &self.parameters)
-            //.field("body", &self.body)
+            .field("body", &self.body)
             .finish()
     }
 }
 
 impl Function {
     pub fn call(&self, arguments: Vec<Value>) -> Value {
-        let mut state = (*self.outer_state).borrow().clone();
         if arguments.len() != self.parameters.len() {
             panic!("Argument and Parameter length should be the same")
         }
-        for (argument_name, argument_value) in self.parameters.iter().zip(arguments) {
-            state.set_variable(argument_name, argument_value);
-        }
-        interpret_code_block(&self.body, Rc::new(RefCell::new(state))).0
+        interpret_code_block(
+            &self.body,
+            &self.outer_state,
+            self.parameters.iter().zip(arguments).collect::<Vec<_>>(),
+        )
+        .0
     }
 }

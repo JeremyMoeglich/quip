@@ -79,7 +79,7 @@ impl ExpressionParseRules {
 mod tests {
     use crate::{
         ast::{Expression, FancyStringFragment, Literal},
-        parser::{utils::new_span},
+        parser::utils::new_span,
     };
 
     use super::*;

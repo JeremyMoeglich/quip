@@ -1,19 +1,16 @@
 mod assignment;
+mod block;
+mod declaration;
 pub mod expression;
+mod function;
 mod identifier;
+mod if_statement;
 mod statement;
 mod utils;
-mod function;
-mod block;
-mod if_statement;
-mod declaration;
 
 use nom::{multi::many0, IResult};
 
-use crate::{
-    ast::{CodeBlock},
-    parser::utils::Span,
-};
+use crate::{ast::CodeBlock, parser::utils::Span};
 
 use self::{statement::parse_statement, utils::new_span};
 

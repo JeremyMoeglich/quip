@@ -14,8 +14,5 @@ pub fn interpret_call(
         arguments.push(interpret_expression(arg, state));
     }
     let function = interpret_expression(func, state);
-    match function {
-        Value::Function(function) => function.call(arguments),
-        _ => panic!("Cannot call {:?} as a function", function),
-    }
+    function.try_call(arguments)
 }

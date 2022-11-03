@@ -1,11 +1,21 @@
-use nom::{branch::alt, combinator::{map, opt}, sequence::tuple, IResult, bytes::complete::tag};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    combinator::{map, opt},
+    sequence::tuple,
+    IResult,
+};
 
 use crate::ast::Statement;
 
 use super::{
-    assignment::parse_assignment, block::parse_block, declaration::parse_declaration,
-    expression::parse_expression, function::parse_function, if_statement::parse_if_statement,
-    utils::{Span, ws},
+    assignment::parse_assignment,
+    block::parse_block,
+    declaration::parse_declaration,
+    expression::parse_expression,
+    function::parse_function,
+    if_statement::parse_if_statement,
+    utils::{ws, Span},
 };
 
 pub fn parse_statement(input: Span) -> IResult<Span, Statement> {

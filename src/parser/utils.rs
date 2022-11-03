@@ -5,7 +5,8 @@ extern crate nom_locate;
 use nom::{
     branch::alt,
     bytes::{complete::is_not, streaming::tag},
-    character::complete::{multispace0, multispace1, not_line_ending},
+    character::complete::{multispace1, not_line_ending},
+    multi::{many0, many1},
     sequence::delimited,
     IResult,
 };
@@ -37,13 +38,20 @@ fn comment(input: Span) -> IResult<Span, Span> {
     alt((single_line_comment, multi_line_comment))(input)
 }
 
+fn allow_incomplete(error: nom::Err<nom::error::Error<Span>>) -> nom::Err<nom::error::Error<Span>> {
+    match error {
+        nom::Err::Incomplete(_) => nom::Err::Incomplete(nom::Needed::Unknown),
+        _ => error,
+    }
+}
+
 pub fn ws(input: Span) -> IResult<Span, Span> {
-    let (input, _) = alt((multispace0, comment))(input)?;
+    let (input, _) = many0(alt((comment, multispace1)))(input)?;
     Ok((input, input))
 }
 
 pub fn ws1(input: Span) -> IResult<Span, Span> {
-    let (input, _) = alt((multispace1, comment))(input)?;
+    let (input, _) = many1(alt((comment, multispace1)))(input)?;
     Ok((input, input))
 }
 

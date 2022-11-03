@@ -6,22 +6,21 @@ use crate::{
 use super::interpret_expression;
 
 pub fn interpret_string(string: &FancyString, state: &ProgramState) -> Value {
-    Value::String(
-        string
-            .iter()
-            .map(|string_part| match string_part {
-                FancyStringFragment::LiteralString(literal) => literal.clone(),
-                FancyStringFragment::Expression(expression) => {
-                    let value = interpret_expression(expression, state);
-                    match value {
-                        Value::String(string) => string,
-                        _ => panic!("Cannot convert {:?} to string", value),
+    match state.get_variable("join") {
+        Some(value) => value.try_call(
+            string
+                .iter()
+                .map(|string_part| match string_part {
+                    FancyStringFragment::LiteralString(literal) => Value::String(literal.clone()),
+                    FancyStringFragment::Expression(expression) => {
+                        interpret_expression(expression, state)
                     }
-                }
-                FancyStringFragment::FormatPlaceholder => {
-                    unimplemented!("Format placeholders are not implemented yet")
-                }
-            })
-            .collect::<String>(),
-    )
+                    FancyStringFragment::FormatPlaceholder => {
+                        unimplemented!("Format placeholders are not implemented yet")
+                    }
+                })
+                .collect(),
+        ),
+        _ => Value::Error("join() is not defined".to_string()),
+    }
 }

@@ -28,6 +28,10 @@ pub fn parse_declaration(input: Span) -> IResult<Span, Statement> {
     })(input)?;
     Ok((
         input,
-        Statement::Declaration((identifier, "some_empty_type".to_string()), mutable, expression_opt),
+        Statement::Declaration(
+            (identifier, "some_empty_type".to_string()),
+            mutable,
+            expression_opt,
+        ),
     ))
 }

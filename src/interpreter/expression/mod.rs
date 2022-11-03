@@ -5,8 +5,6 @@ mod single_operation;
 mod string;
 mod variable;
 
-use std::{rc::Rc, cell::RefCell};
-
 use crate::ast::Expression;
 
 use self::{
