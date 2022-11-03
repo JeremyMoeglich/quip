@@ -1,4 +1,8 @@
-use std::fmt::{Debug, Formatter};
+use std::{
+    cell::RefCell,
+    fmt::{Debug, Formatter},
+    rc::Rc,
+};
 
 use crate::ast::CodeBlock;
 
@@ -27,7 +31,7 @@ impl Debug for Function {
 }
 
 impl Function {
-    pub fn call(&self, arguments: Vec<Value>) -> Value {
+    pub fn call(&self, arguments: Vec<ValueRef>) -> ValueRef {
         if arguments.len() != self.parameters.len() {
             panic!("Argument and Parameter length should be the same")
         }

@@ -1,20 +1,20 @@
-use num::BigInt;
+use std::{cell::RefCell, rc::Rc};
 
-use crate::interpreter::state::Value;
+use crate::interpreter::state::{Value, ValueRef};
 
 use super::access_error::access_error;
 
-pub fn access_integer(value: BigInt, name: &str) -> Value {
-    match name {
-        "to_string" => {
-            Value::NativeFunction(vec![Value::Integer(value)], |args| match args.len() {
-                1 => match &args[0] {
-                    Value::Integer(ref s) => Value::String(s.to_string()),
-                    _ => unreachable!("Internal error, invalid argument type"),
-                },
-                _ => Value::Error("Invalid number of arguments".to_string()),
-            })
-        }
+pub fn access_integer(value: ValueRef, name: &str) -> ValueRef {
+    Rc::new(RefCell::new(match name {
+        "to_string" => Value::NativeFunction(vec![value], |args| match args.len() {
+            1 => match *args[0].borrow() {
+                Value::Integer(s) => Rc::new(RefCell::new(Value::String(s.to_string()))),
+                _ => unreachable!("Internal error, invalid argument type"),
+            },
+            _ => Rc::new(RefCell::new(Value::Error(
+                "Invalid number of arguments".to_string(),
+            ))),
+        }),
         _ => access_error("String", &name),
-    }
+    }))
 }

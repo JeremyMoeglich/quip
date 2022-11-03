@@ -7,7 +7,7 @@ use super::interpret_expression;
 
 pub fn interpret_string(string: &FancyString, state: &ProgramState) -> Value {
     match state.get_variable("join") {
-        Some(value) => value.try_call(
+        Some(value) => value.borrow_mut().try_call(
             string
                 .iter()
                 .map(|string_part| match string_part {

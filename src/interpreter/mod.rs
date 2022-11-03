@@ -9,7 +9,9 @@ mod statement;
 use crate::ast::CodeBlock;
 
 use self::{
-    code_block::interpret_code_block, native_functions::NATIVE_FUNCTIONS, state::{ProgramState, Value},
+    code_block::interpret_code_block,
+    native_functions::NATIVE_FUNCTIONS,
+    state::{ProgramState, Value},
 };
 
 pub fn interpret_ast(block: CodeBlock) -> ProgramState {

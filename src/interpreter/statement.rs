@@ -6,7 +6,7 @@ use super::{
     state::{ProgramState, Value},
 };
 
-pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Value {
+pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> ValueRef {
     match statement {
         Statement::Assignment(name, value) => {
             let value = interpret_expression(value, state);

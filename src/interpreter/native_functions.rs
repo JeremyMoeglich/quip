@@ -44,6 +44,12 @@ fn input(args: Vec<Value>) -> Value {
         print!("{}", string);
         std::io::stdout().flush().unwrap();
         std::io::stdin().read_line(&mut input).unwrap();
+        if let Some('\r') = input.chars().next_back() {
+            input.pop();
+        }
+        if let Some('\n') = input.chars().next_back() {
+            input.pop();
+        }
         Value::String(input)
     } else if let Value::Error(error) = joined {
         Value::Error(error)

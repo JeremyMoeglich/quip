@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::{
     state::{ProgramState, Value},
     statement::interpret_statement,
@@ -7,7 +9,7 @@ use crate::ast::CodeBlock;
 pub fn interpret_code_block(
     code_block: &CodeBlock,
     state: &ProgramState,
-    added_variables: Vec<(&String, Value)>,
+    added_variables: Vec<(&String, ValueRef)>,
 ) -> (Value, ProgramState) {
     let state = state.new_scope();
     for (name, value) in added_variables {

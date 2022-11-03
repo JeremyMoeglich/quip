@@ -22,7 +22,13 @@ pub fn simple_parse(input: &str) -> Result<CodeBlock, nom::Err<nom::error::Error
     let input = new_span(input);
     let iresult = parse_code(input);
     match iresult {
-        Ok((_, expression)) => Ok(expression),
+        Ok((input, expression)) => match input.fragment() {
+            &"" => Ok(expression),
+            _ => Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            ))),
+        },
         Err(err) => Err(err),
     }
 }
