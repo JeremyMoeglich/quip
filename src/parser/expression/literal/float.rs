@@ -36,9 +36,9 @@ pub fn parse_float(input: Span) -> IResult<Span, f64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::utils::new_span;
-
     use super::*;
+    use crate::parser::utils::new_span;
+    use pretty_assertions::assert_eq;
 
     fn test_fn(input: &str) -> Option<f64> {
         match parse_float(new_span(input)) {

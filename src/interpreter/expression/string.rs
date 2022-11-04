@@ -1,17 +1,19 @@
 use crate::{
     ast::{FancyString, FancyStringFragment},
-    interpreter::state::{ProgramState, Value},
+    interpreter::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
 };
 
 use super::interpret_expression;
 
-pub fn interpret_string(string: &FancyString, state: &ProgramState) -> Value {
+pub fn interpret_string(string: &FancyString, state: &ProgramState) -> ValueRef {
     match state.get_variable("join") {
-        Some(value) => value.borrow_mut().try_call(
+        Some(value) => value.try_call(
             string
                 .iter()
                 .map(|string_part| match string_part {
-                    FancyStringFragment::LiteralString(literal) => Value::String(literal.clone()),
+                    FancyStringFragment::LiteralString(literal) => {
+                        ValueRef::new(Value::String(literal.clone()))
+                    }
                     FancyStringFragment::Expression(expression) => {
                         interpret_expression(expression, state)
                     }
@@ -21,6 +23,6 @@ pub fn interpret_string(string: &FancyString, state: &ProgramState) -> Value {
                 })
                 .collect(),
         ),
-        _ => Value::Error("join() is not defined".to_string()),
+        _ => ValueRef::new(Value::Error("join() is not defined".to_string())),
     }
 }

@@ -1,7 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
-
 use super::{
-    state::{ProgramState, Value},
+    state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
     statement::interpret_statement,
 };
 use crate::ast::CodeBlock;
@@ -10,14 +8,20 @@ pub fn interpret_code_block(
     code_block: &CodeBlock,
     state: &ProgramState,
     added_variables: Vec<(&String, ValueRef)>,
-) -> (Value, ProgramState) {
+) -> (ValueRef, ProgramState) {
     let state = state.new_scope();
     for (name, value) in added_variables {
-        state.set_variable(&name, value);
+        state.set_new_variable(&name, value);
     }
-    let mut return_value = Value::None;
     for statement in code_block {
-        return_value = interpret_statement(&statement, &state);
+        let value_ref = interpret_statement(&statement, &state);
+        let mut return_now = true;
+        if let Value::Void = &*value_ref.get() {
+            return_now = false;
+        }
+        if return_now {
+            return (value_ref, state);
+        }
     }
-    return (return_value, state);
+    return (ValueRef::none(), state);
 }

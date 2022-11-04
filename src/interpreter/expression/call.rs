@@ -1,6 +1,6 @@
 use crate::{
     ast::Expression,
-    interpreter::state::{ProgramState, Value},
+    interpreter::state::{program_state::ProgramState, value_ref::ValueRef},
 };
 
 use super::interpret_expression;
@@ -8,7 +8,7 @@ use super::interpret_expression;
 pub fn interpret_call(
     (func, args): (&Expression, &Vec<Expression>),
     state: &ProgramState,
-) -> Value {
+) -> ValueRef {
     let mut arguments = Vec::new();
     for arg in args {
         arguments.push(interpret_expression(arg, state));

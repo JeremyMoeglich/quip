@@ -1,6 +1,6 @@
 use crate::{
     ast::{Expression, SingleOperation},
-    interpreter::state::{ProgramState, Value},
+    interpreter::state::{program_state::ProgramState, value_ref::ValueRef},
 };
 
 use super::interpret_expression;
@@ -8,7 +8,7 @@ use super::interpret_expression;
 pub fn interpret_single_operation(
     (op, expr): (&SingleOperation, &Expression),
     state: &ProgramState,
-) -> Value {
+) -> ValueRef {
     let expr = interpret_expression(&expr, state);
     expr.single_operation(op)
 }

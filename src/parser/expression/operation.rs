@@ -479,9 +479,9 @@ pub fn parse_operation(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<
 
 #[cfg(test)]
 mod tests {
-    use num::BigInt;
-
     use crate::parser::{expression::parse_expression, utils::new_span};
+    use num::BigInt;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 

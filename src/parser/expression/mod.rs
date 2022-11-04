@@ -1,4 +1,5 @@
 mod call;
+mod list;
 mod literal;
 mod operation;
 mod variable;
@@ -13,9 +14,11 @@ use nom::{
 
 use crate::{ast, parser::utils::Span};
 
-use self::{literal::parse_literal, operation::parse_operation, variable::parse_variable};
+use self::{
+    list::parse_list, literal::parse_literal, operation::parse_operation, variable::parse_variable,
+};
 
-use super::utils::ws;
+use super::{parse_code, utils::ws};
 
 pub fn parse_expression(input: Span) -> IResult<Span, crate::ast::Expression> {
     parse_expression_with_rule(ExpressionParseRules::default())(input)
@@ -33,16 +36,21 @@ pub fn parse_expression_with_rule(
                     nom::error::ErrorKind::Alt,
                 ))),
             },
+            parse_list,
             delimited(
                 tuple((char('('), ws)),
                 parse_expression,
                 tuple((ws, char(')'))),
             ),
+            map(
+                delimited(tuple((char('{'), ws)), parse_code, tuple((ws, char('}')))),
+                |code| ast::Expression::Block(code),
+            ),
             map(parse_literal, |literal| ast::Expression::Literal(literal)),
             parse_variable,
         ))(input)?;
         match rules.allow_call {
-            true => call::parse_call(expression)(input),
+            true => call::parse_call_and_get(expression)(input),
             false => Ok((input, expression)),
         }
     }
@@ -81,6 +89,7 @@ mod tests {
         ast::{Expression, FancyStringFragment, Literal},
         parser::utils::new_span,
     };
+    use pretty_assertions::assert_eq;
 
     use super::*;
 

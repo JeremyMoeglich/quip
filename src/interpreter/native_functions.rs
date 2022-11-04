@@ -2,44 +2,44 @@ use std::io::Write;
 
 use crate::ast::Operator;
 
-use super::state::Value;
+use super::state::{value::value::Value, value_ref::ValueRef};
 
-fn join(args: Vec<Value>) -> Value {
+fn join(args: Vec<ValueRef>) -> ValueRef {
     let converted = args
         .iter()
-        .map(|x| x.access_property("to_string").try_call(vec![]))
+        .map(|x| x.get_property("to_string").try_call(vec![]))
         .reduce(|x, y| x.operation(&Operator::Add, &y))
-        .unwrap_or(Value::String("".to_string()));
-    converted
+        .unwrap_or(ValueRef::new(Value::String("".to_string())));
+    converted.resolve()
 }
 
-fn print(args: Vec<Value>) -> Value {
+fn print(args: Vec<ValueRef>) -> ValueRef {
     let joined = join(args);
-    if let Value::String(string) = joined {
+    if let Value::String(string) = &*joined.clone().get() {
         print!("{}", string);
-        Value::None
-    } else if let Value::Error(error) = joined {
-        Value::Error(error)
+        ValueRef::none()
+    } else if let Value::Error(_) = &*joined.get() {
+        joined.clone()
     } else {
         unreachable!("Internal error: join() returned a non-string");
     }
 }
 
-fn println(args: Vec<Value>) -> Value {
+fn println(args: Vec<ValueRef>) -> ValueRef {
     let joined = join(args);
-    if let Value::String(string) = joined {
+    if let Value::String(string) = &*joined.clone().get() {
         println!("{}", string);
-        Value::None
-    } else if let Value::Error(error) = joined {
-        Value::Error(error)
+        ValueRef::none()
+    } else if let Value::Error(_) = &*joined.get() {
+        joined.clone()
     } else {
         unreachable!("Internal error: join() returned a non-string");
     }
 }
 
-fn input(args: Vec<Value>) -> Value {
+fn input(args: Vec<ValueRef>) -> ValueRef {
     let joined = join(args);
-    if let Value::String(string) = joined {
+    if let Value::String(string) = &*joined.clone().get() {
         let mut input = String::new();
         print!("{}", string);
         std::io::stdout().flush().unwrap();
@@ -50,9 +50,9 @@ fn input(args: Vec<Value>) -> Value {
         if let Some('\n') = input.chars().next_back() {
             input.pop();
         }
-        Value::String(input)
-    } else if let Value::Error(error) = joined {
-        Value::Error(error)
+        ValueRef::new(Value::String(input))
+    } else if let Value::Error(_) = &*joined.get() {
+        joined.clone()
     } else {
         unreachable!("Internal error: join() returned a non-string");
     }

@@ -12,10 +12,12 @@ use nom::{multi::many0, IResult};
 
 use crate::{ast::CodeBlock, parser::utils::Span};
 
-use self::{statement::parse_statement, utils::new_span};
+use self::{statement::parse_statement, utils::{new_span, ws}};
 
 pub fn parse_code(input: Span) -> IResult<Span, CodeBlock> {
-    many0(parse_statement)(input)
+    let (input, out) = many0(parse_statement)(input)?;
+    let (input, _) = ws(input)?;
+    Ok((input, out))
 }
 
 pub fn simple_parse(input: &str) -> Result<CodeBlock, nom::Err<nom::error::Error<Span>>> {

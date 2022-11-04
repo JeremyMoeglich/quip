@@ -1,14 +1,14 @@
 mod ast;
 mod interpreter;
 mod parser;
+mod tests;
 
 fn main() {
-    let test_content = r###"
-fn main() {
-    let a = /* 1 + 2 */ 3;
-}
-    "###;
-    let expr = parser::simple_parse(test_content);
-    let state = interpreter::interpret_ast(expr.unwrap());
-    println!("{:?}", state.run_function("main", vec![]));
+    let test_content = include_str!("example_files/1.qp");
+    match interpreter::interpret_code(test_content, vec![]) {
+        Ok(_state) => (),
+        Err(error) => {
+            println!("{}", error);
+        }
+    }
 }

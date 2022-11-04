@@ -5,28 +5,28 @@ mod integer;
 mod list;
 mod string;
 
-use std::{cell::RefCell, rc::Rc};
-
 use access_error::access_error;
 
-use crate::interpreter::state::Value;
-
-use super::state::ValueRef;
+use super::state::{value::value::Value, value_ref::ValueRef};
 
 pub fn interpret_access(left: ValueRef, right: &str) -> ValueRef {
-    match *left.borrow_mut() {
-        Value::String(_) => string::access_string(left, right),
-        Value::Integer(_) => integer::access_integer(left, right),
-        Value::Float(_) => float::access_float(left, right),
-        Value::Boolean(_) => boolean::access_boolean(left, right),
-        Value::List(_) => list::access_list(left, right),
-        Value::None => Rc::new(RefCell::new(access_error("None", right))),
-        Value::Error(_) => left,
-        Value::NativeFunction(_, _) => Rc::new(RefCell::new(Value::Error(
-            "Functions do not have properties".to_string(),
-        ))),
-        Value::Function(_) => Rc::new(RefCell::new(Value::Error(
-            "Functions do not have properties".to_string(),
-        ))),
+    match &*left.resolve().get() {
+        Value::String(_) => string::access_string(left.clone(), right),
+        Value::Integer(_) => integer::access_integer(left.clone(), right),
+        Value::Float(_) => float::access_float(left.clone(), right),
+        Value::Boolean(_) => boolean::access_boolean(left.clone(), right),
+        Value::List(_) => list::access_list(left.clone(), right),
+        Value::None => ValueRef::new(access_error("None", right)),
+        Value::Void => {
+            unreachable!("Void is not a value, so it should not be possible to access it")
+        }
+        Value::Error(_) => left.clone(),
+        Value::NativeFunction(_, _) => {
+            ValueRef::new(Value::Error("Functions do not have properties".to_string()))
+        }
+        Value::Function(_) => {
+            ValueRef::new(Value::Error("Functions do not have properties".to_string()))
+        }
+        Value::Reference(_) => unreachable!("Reference should have been resolved"),
     }
 }

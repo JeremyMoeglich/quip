@@ -1,6 +1,6 @@
 // 1. Example of quip syntax
 
-env console;
+//env console; // env is not implemented yet
 
 println("Hello World");
 
@@ -9,16 +9,15 @@ fn test() {
     let y = 2;
     let mut z = 3;
 
-    let p = block {
+    let p = {
         let a = 1;
         let b = 2;
         let c = 3;
         a + b + c
     };
-    let t = {
-        p: x + y + z,
-        q: x + y + z,
-    };
+
+    let t = [1, 2, 3, 4, 5];
+
     z = 4;
 
     println("x = {x}, y = {y}, z = {z}");

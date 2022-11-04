@@ -1,25 +1,45 @@
-use crate::ast::Statement;
+use crate::ast::{Expression, Statement};
 
 use super::{
     expression::interpret_expression,
-    function::Function,
-    state::{ProgramState, Value},
+    state::{
+        function::Function,
+        program_state::ProgramState,
+        value::{mutability::ValueMutability, value::Value},
+        value_ref::ValueRef,
+    },
 };
 
 pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> ValueRef {
     match statement {
-        Statement::Assignment(name, value) => {
-            let value = interpret_expression(value, state);
-            state.reassign_variable(name, value);
-            Value::None
+        Statement::StopReturn(statement) => {
+            let value = interpret_statement(statement, state);
+            match *value.resolve().get() {
+                Value::Error(_) => value,
+                _ => ValueRef::none(),
+            }
+        }
+        Statement::Assignment(to_change, value) => {
+            let value_ref = interpret_expression(value, state);
+            match to_change {
+                Expression::Variable(name) => state.replace_variable(name, value_ref),
+                _ => {
+                    let to_change = interpret_expression(to_change, state);
+                    to_change.set(match value_ref.get().get_mutability() {
+                        ValueMutability::Mutable => Value::Reference(value_ref.clone()),
+                        ValueMutability::Immutable => value_ref.get().clone(),
+                    });
+                }
+            }
+            ValueRef::none()
         }
         Statement::Declaration((name, _), _, value) => {
             let value = match value {
                 Some(value) => interpret_expression(value, state),
-                None => Value::None,
+                None => ValueRef::none(),
             };
-            state.set_variable(name, value);
-            Value::None
+            state.set_new_variable(name, value);
+            ValueRef::none()
         }
         Statement::Function(name, parameters, body) => {
             let function = Function {
@@ -28,8 +48,8 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Value
                 body: body.clone(),
                 outer_state: state.clone(),
             };
-            state.set_variable(name, Value::Function(function));
-            Value::None
+            state.set_new_variable(name, ValueRef::new(Value::Function(function)));
+            ValueRef::none()
         }
         Statement::Expression(expression) => {
             let value = interpret_expression(expression, state);
@@ -41,8 +61,8 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Value
         }
         Statement::If(condition, if_block, else_block) => {
             let condition = interpret_expression(condition, state);
-            if let Value::Boolean(condition) = condition {
-                if condition {
+            if let Value::Boolean(condition) = &*condition.clone().get() {
+                if *condition {
                     let (value, _) =
                         super::code_block::interpret_code_block(if_block, state, vec![]);
                     value

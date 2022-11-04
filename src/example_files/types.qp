@@ -1,0 +1,71 @@
+// This is an example of types in the quip programming language
+
+fn main() {
+    let x = 5; // infered as an int
+    let y = 5.0; // infered as a float
+    let z = "Hello World"; // infered as a string
+    z = 5; // error: cannot assign int to string
+
+    let z = 5; // allowed because z is redeclared
+    let z: int | string = 5;
+    z = "Hello World"; // allowed because z is now a union of int and string
+
+    let k = [1, 2, 3]; // infered as an array of int
+    k[0] = z; // error: cannot assign int to string
+
+    // the _ type is for strict inferrence
+    
+    let a: _ = 5; // infered as an int
+    a = "Hello World"; // error: cannot assign string to int
+
+    // the any type is for loose inferrence
+
+    let b: any = 5; // infered as an any
+    b = "Hello World"; // allowed because b accepts any type
+}
+
+struct Point {
+    x: int,
+    y: int
+}
+
+impl Point {
+    fn new(x, y) { 
+        // not defining a type is strict inferrence (like _) so this function only accepts int
+        Point { x: x, y: y } 
+    }
+
+    fn new2(x: any, y: any) -> any { 
+        // this function accepts any type that might be an int so for example (string | int)
+        // note that the return type is Point, not any
+        Point { x: x, y: y } 
+    }
+}
+
+//class Point { // this class is identical to the struct above
+//    x: int,
+//    y: int
+//
+//    fn new(x, y) {
+//        Point { x, y } 
+//    }
+//
+//    fn new2(x: any, y: any) {
+//        Point { x, y } 
+//    }
+//} // Classes are not that important in quip, they are just syntactic sugar for structs (and they are not even implemented yet)
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+type Color = "Red" | "Green" | "Blue"; // the union type is different, but can usually be used in the same way
+
+// The following is the same as the enum above
+type Color = {
+    Red: (),
+    Green: (),
+    Blue: ()
+}

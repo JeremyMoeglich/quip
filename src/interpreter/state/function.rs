@@ -1,15 +1,8 @@
-use std::{
-    cell::RefCell,
-    fmt::{Debug, Formatter},
-    rc::Rc,
-};
+use std::fmt::{Debug, Formatter};
 
-use crate::ast::CodeBlock;
+use crate::{ast::CodeBlock, interpreter::code_block::interpret_code_block};
 
-use super::{
-    code_block::interpret_code_block,
-    state::{ProgramState, Value},
-};
+use super::{program_state::ProgramState, value_ref::ValueRef};
 
 #[derive(Clone)]
 pub struct Function {
