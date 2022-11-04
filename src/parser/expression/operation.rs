@@ -422,16 +422,23 @@ fn parse_operator(input: Span) -> IResult<Span, OrderedOperator> {
 }
 
 fn parse_operator_and_segment(input: Span) -> IResult<Span, (OrderedOperator, Segment)> {
+    let input_copy = input.clone();
     let (input, _) = ws(input)?;
     let (input, operator) = parse_operator(input)?;
     let (input, _) = ws(input)?;
     // allow calls if operator has a higher priority than the call operator
     let call_priority = 9;
     let used_rules = match operator.priority {
-        p if p < call_priority => ExpressionParseRules::default(),
+        p if p > call_priority => ExpressionParseRules::default(),
         _ => ExpressionParseRules::default().with_call(false),
     };
     let (input, segment) = parse_segment(used_rules)(input)?;
+    println!(
+        "{:?} -> {:?}, rem: {}",
+        input_copy.fragment(),
+        segment,
+        input.fragment()
+    );
     Ok((input, (operator, segment)))
 }
 

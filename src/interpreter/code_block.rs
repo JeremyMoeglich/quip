@@ -1,5 +1,5 @@
 use super::{
-    state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
+    state::{program_state::ProgramState, value_ref::ValueRef},
     statement::interpret_statement,
 };
 use crate::ast::CodeBlock;
@@ -15,13 +15,12 @@ pub fn interpret_code_block(
     }
     for statement in code_block {
         let value_ref = interpret_statement(&statement, &state);
-        let mut return_now = true;
-        if let Value::Void = &*value_ref.get() {
-            return_now = false;
-        }
-        if return_now {
-            return (value_ref, state);
-        }
+        match value_ref {
+            Some(value) => {
+                return (value, state);
+            }
+            None => {}
+        };
     }
     return (ValueRef::none(), state);
 }

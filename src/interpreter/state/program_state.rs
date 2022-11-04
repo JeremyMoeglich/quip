@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use super::value_ref::ValueRef;
+use super::{value::value::Value, value_ref::ValueRef};
 
 #[derive(Debug, Clone)]
 pub struct ProgramScope {
@@ -43,13 +43,16 @@ impl ProgramState {
             .insert(name.to_string(), value);
     }
 
-    pub fn replace_variable(&self, name: &str, value: ValueRef) {
+    pub fn replace_variable(&self, name: &str, value: ValueRef) -> Result<(), ValueRef> {
         for scope in self.scopes.iter().rev() {
             if scope.borrow().variables.contains_key(name) {
                 scope.borrow_mut().variables.insert(name.to_string(), value);
-                return;
+                return Ok(());
             }
         }
-        panic!("Variable {} not found", name); // TODO: Handle Error
+        Err(ValueRef::new(Value::Error(format!(
+            "Variable {} not found",
+            name
+        ))))
     }
 }

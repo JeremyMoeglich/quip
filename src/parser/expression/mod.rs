@@ -86,7 +86,7 @@ impl ExpressionParseRules {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Expression, FancyStringFragment, Literal},
+        ast::{Expression, FancyStringFragment, Literal, Operator},
         parser::utils::new_span,
     };
     use pretty_assertions::assert_eq;
@@ -107,6 +107,23 @@ mod tests {
                 parse_expression(new_span("((obj!).field)(5, 2)"))
                     .unwrap()
                     .1,
+            ),
+            (
+                r#"("5".to_int() + 5)"#,
+                parse_expression(new_span(r#"((("5").to_int)() + 5)"#))
+                    .unwrap()
+                    .1,
+            ),
+            (
+                r#""5".to_int()"#,
+                Expression::Call(
+                    Box::new(Expression::Operation(
+                        Box::new(parse_expression(new_span(r#""5""#)).unwrap().1),
+                        Operator::Access,
+                        Box::new(Expression::Variable("to_int".to_string())),
+                    )),
+                    vec![],
+                ),
             ),
         ];
 

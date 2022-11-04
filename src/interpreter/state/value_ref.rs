@@ -28,10 +28,6 @@ impl ValueRef {
         Self::new(Value::None)
     }
 
-    pub fn void() -> Self {
-        Self::new(Value::Void)
-    }
-
     pub fn set(&self, value: Value) {
         *self.value.borrow_mut() = value;
     }

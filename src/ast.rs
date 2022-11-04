@@ -88,4 +88,5 @@ pub type Mutable = bool;
 pub enum TypeExpression {
     Variable(Identifier),
     Array(Box<TypeExpression>),
+    Union(Vec<TypeExpression>),
 }

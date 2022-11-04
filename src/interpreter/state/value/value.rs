@@ -13,7 +13,6 @@ pub enum Value {
     String(String),
     Boolean(bool),
     None,
-    Void,
     Function(Function),
     NativeFunction(Vec<ValueRef>, fn(Vec<ValueRef>) -> ValueRef),
     Error(String),
@@ -30,9 +29,6 @@ impl Value {
             Value::String(_) => ValueType::String,
             Value::Boolean(_) => ValueType::Boolean,
             Value::None => ValueType::None,
-            Value::Void => {
-                unreachable!("Void is not a value, so it should not be possible to get its type")
-            }
             Value::Function(_) => ValueType::Function,
             Value::NativeFunction(..) => ValueType::NativeFunction,
             Value::Error(_) => ValueType::Error,
@@ -42,6 +38,7 @@ impl Value {
         }
     }
 
+
     pub fn get_mutability(&self) -> ValueMutability {
         match self {
             Value::Integer(_) => ValueMutability::Immutable,
@@ -49,11 +46,6 @@ impl Value {
             Value::String(_) => ValueMutability::Immutable,
             Value::Boolean(_) => ValueMutability::Immutable,
             Value::None => ValueMutability::Immutable,
-            Value::Void => {
-                unreachable!(
-                    "Void is not a value, so it should not be possible to get its mutability"
-                )
-            }
             Value::Function(_) => ValueMutability::Immutable,
             Value::NativeFunction(..) => ValueMutability::Immutable,
             Value::Error(_) => ValueMutability::Immutable,
@@ -72,9 +64,6 @@ impl Display for Value {
             Value::String(s) => write!(f, "{}", s),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::None => write!(f, "None"),
-            Value::Void => {
-                unreachable!("Void is not a value, so it should not be possible to display it")
-            }
             Value::Function(_) => write!(f, "Function"),
             Value::NativeFunction(_, _) => write!(f, "Native Function"),
             Value::Error(e) => write!(f, "Error: {}", e),

@@ -10,36 +10,50 @@ use super::{
     },
 };
 
-pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> ValueRef {
+pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Option<ValueRef> {
     match statement {
-        Statement::StopReturn(statement) => {
-            let value = interpret_statement(statement, state);
-            match *value.resolve().get() {
-                Value::Error(_) => value,
-                _ => ValueRef::none(),
-            }
-        }
+        Statement::StopReturn(statement) => match interpret_statement(statement, state) {
+            Some(value) => match *value.resolve().get() {
+                Value::Error(_) => Some(value),
+                _ => None,
+            },
+            None => None,
+        },
         Statement::Assignment(to_change, value) => {
             let value_ref = interpret_expression(value, state);
+            if let Value::Error(_) = *value_ref.resolve().get() {
+                return Some(value_ref);
+            }
             match to_change {
-                Expression::Variable(name) => state.replace_variable(name, value_ref),
+                Expression::Variable(name) => match state.replace_variable(name, value_ref) {
+                    Ok(_) => None,
+                    Err(value) => Some(value),
+                },
                 _ => {
                     let to_change = interpret_expression(to_change, state);
+                    if let Value::Error(_) = *to_change.resolve().get() {
+                        return Some(to_change);
+                    }
                     to_change.set(match value_ref.get().get_mutability() {
                         ValueMutability::Mutable => Value::Reference(value_ref.clone()),
                         ValueMutability::Immutable => value_ref.get().clone(),
                     });
+                    None
                 }
             }
-            ValueRef::none()
         }
         Statement::Declaration((name, _), _, value) => {
             let value = match value {
-                Some(value) => interpret_expression(value, state),
-                None => ValueRef::none(),
+                Some(value) => match interpret_expression(value, state) {
+                    value_ref => match *value_ref.resolve().get() {
+                        Value::Error(_) => return Some(value_ref),
+                        _ => value_ref,
+                    },
+                },
+                None => return None,
             };
             state.set_new_variable(name, value);
-            ValueRef::none()
+            None
         }
         Statement::Function(name, parameters, body) => {
             let function = Function {
@@ -49,27 +63,30 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Value
                 outer_state: state.clone(),
             };
             state.set_new_variable(name, ValueRef::new(Value::Function(function)));
-            ValueRef::none()
+            None
         }
         Statement::Expression(expression) => {
             let value = interpret_expression(expression, state);
-            value
+            Some(value)
         }
         Statement::Scope(code_block) => {
             let (value, _) = super::code_block::interpret_code_block(code_block, state, vec![]);
-            value
+            Some(value)
         }
         Statement::If(condition, if_block, else_block) => {
-            let condition = interpret_expression(condition, state);
+            let condition = interpret_expression(condition, state).resolve();
+            if let Value::Error(_) = &*condition.clone().get() {
+                return Some(condition);
+            }
             if let Value::Boolean(condition) = &*condition.clone().get() {
                 if *condition {
                     let (value, _) =
                         super::code_block::interpret_code_block(if_block, state, vec![]);
-                    value
+                    Some(value)
                 } else {
                     let (value, _) =
                         super::code_block::interpret_code_block(else_block, state, vec![]);
-                    value
+                    Some(value)
                 }
             } else {
                 panic!("Condition should be a boolean");
