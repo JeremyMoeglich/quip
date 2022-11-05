@@ -136,7 +136,7 @@ impl ValueRef {
             },
             Operator::Access => match *right.get() {
                 Value::String(ref s) => left.get_property(s),
-                _ => panic!("Invalid access: {:?} {:?}", left, right),
+                _ => ValueRef::new(Value::Error("Cannot access with non-string".to_string())),
             },
             _ => unimplemented!("Operation {:?} is not implemented yet", op),
         }

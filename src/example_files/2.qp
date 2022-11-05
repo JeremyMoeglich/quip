@@ -1,0 +1,6 @@
+let v1 = input("Enter a number (1): ").to_float()
+let v2 = input("Enter a number (2): ").to_float()
+
+let result = v1 + v2
+
+println("The result is: " + result.to_string())

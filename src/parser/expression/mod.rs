@@ -1,4 +1,3 @@
-mod call;
 mod list;
 mod literal;
 mod operation;
@@ -49,10 +48,7 @@ pub fn parse_expression_with_rule(
             map(parse_literal, |literal| ast::Expression::Literal(literal)),
             parse_variable,
         ))(input)?;
-        match rules.allow_call {
-            true => call::parse_call_and_get(expression)(input),
-            false => Ok((input, expression)),
-        }
+        Ok((input, expression))
     }
 }
 

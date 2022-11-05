@@ -38,7 +38,6 @@ impl Value {
         }
     }
 
-
     pub fn get_mutability(&self) -> ValueMutability {
         match self {
             Value::Integer(_) => ValueMutability::Immutable,

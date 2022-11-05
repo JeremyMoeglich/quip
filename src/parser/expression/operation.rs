@@ -1,12 +1,19 @@
 use lazy_static::lazy_static;
-use nom::{bytes::complete::tag, combinator::map, IResult};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    combinator::map,
+    multi::separated_list0,
+    sequence::{delimited, tuple},
+    IResult,
+};
 
 use crate::{
     ast::{Expression, Literal, Operator, SingleOperation},
     parser::utils::{vec_alt, ws, Span},
 };
 
-use super::{parse_expression_with_rule, ExpressionParseRules};
+use super::{parse_expression, parse_expression_with_rule, ExpressionParseRules};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
@@ -209,17 +216,42 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum SingleOperatorData {
+    Standalone(&'static OrderedSingleOperator<'static>),
+    Call(Vec<Expression>),
+    Get(Expression),
+}
+
+impl SingleOperatorData {
+    fn priority(&self) -> u8 {
+        match self {
+            SingleOperatorData::Standalone(operator) => operator.priority,
+            SingleOperatorData::Call(_) => 9,
+            SingleOperatorData::Get(_) => 9,
+        }
+    }
+
+    // fn side(&self) -> Direction {
+    //     match self {
+    //         SingleOperatorData::Standalone(operator) => operator.side,
+    //         SingleOperatorData::Call(_) => Direction::Right,
+    //         SingleOperatorData::Get(_) => Direction::Right,
+    //     }
+    // }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 struct Segment {
     expression: Expression,
-    left_operations: Vec<&'static OrderedSingleOperator<'static>>,
-    right_operations: Vec<&'static OrderedSingleOperator<'static>>,
+    left_operations: Vec<SingleOperatorData>,
+    right_operations: Vec<SingleOperatorData>,
 }
 
 impl Segment {
     fn new(
         expression: Expression,
-        left_operations: Vec<&'static OrderedSingleOperator<'static>>,
-        right_operations: Vec<&'static OrderedSingleOperator<'static>>,
+        left_operations: Vec<SingleOperatorData>,
+        right_operations: Vec<SingleOperatorData>,
     ) -> Self {
         Self {
             expression,
@@ -236,7 +268,7 @@ impl Segment {
         }
     }
 
-    fn add_left_operation(&mut self, operation: &'static OrderedSingleOperator<'static>) {
+    fn add_left_operation(&mut self, operation: SingleOperatorData) {
         // Add a single operation to the left side of the expression
         // Operations are added from the inside out, so the first operation
         // Example:
@@ -246,7 +278,7 @@ impl Segment {
 
         self.left_operations.push(operation);
     }
-    fn add_right_operation(&mut self, operation: &'static OrderedSingleOperator<'static>) {
+    fn add_right_operation(&mut self, operation: SingleOperatorData) {
         // Add a single operation to the right side of the expression
         // Operations are added from the inside out, so the first operation
         // Example:
@@ -257,20 +289,20 @@ impl Segment {
         self.right_operations.push(operation);
     }
 
-    fn peek_left_operation(&self) -> Option<&'static OrderedSingleOperator<'static>> {
+    fn peek_left_operation(&self) -> Option<SingleOperatorData> {
         // Peek the outermost left operation
-        self.left_operations.last().copied()
+        self.left_operations.last().cloned()
     }
-    fn peek_right_operation(&self) -> Option<&'static OrderedSingleOperator<'static>> {
+    fn peek_right_operation(&self) -> Option<SingleOperatorData> {
         // Peek the outermost right operation
-        self.right_operations.last().copied()
+        self.right_operations.last().cloned()
     }
 
-    fn remove_left_operation(&mut self) -> Option<&'static OrderedSingleOperator<'static>> {
+    fn remove_left_operation(&mut self) -> Option<SingleOperatorData> {
         // Remove the outermost left operation
         self.left_operations.pop()
     }
-    fn remove_right_operation(&mut self) -> Option<&'static OrderedSingleOperator<'static>> {
+    fn remove_right_operation(&mut self) -> Option<SingleOperatorData> {
         // Remove the outermost right operation
         self.right_operations.pop()
     }
@@ -308,13 +340,22 @@ impl Segment {
             .chain(self.right_operations.iter())
             .collect::<Vec<_>>();
 
-        operations.sort_by(|a, b| a.priority.cmp(&b.priority));
-        let operations = operations.iter().map(|o| o.operator).collect::<Vec<_>>();
+        operations.sort_by(|a, b| a.priority().cmp(&b.priority()));
 
         let mut expression = self.expression.clone();
 
         for operation in operations {
-            expression = Expression::SingleOperation(operation, Box::new(expression))
+            expression = match operation {
+                SingleOperatorData::Standalone(single_operator) => {
+                    Expression::SingleOperation(single_operator.operator, Box::new(expression))
+                }
+                SingleOperatorData::Call(arguments) => {
+                    Expression::Call(Box::new(expression), arguments.clone())
+                }
+                SingleOperatorData::Get(index) => {
+                    Expression::Get(Box::new(expression), Box::new(index.clone()))
+                }
+            }
         }
 
         expression
@@ -335,7 +376,7 @@ impl Segment {
         let mut right = other.clone();
 
         while let Some(left_operation) = left.peek_left_operation() {
-            if left_operation.priority < operator.priority {
+            if left_operation.priority() < operator.priority {
                 left.move_left_operation(&mut new_segment);
             } else {
                 break;
@@ -343,7 +384,7 @@ impl Segment {
         }
 
         while let Some(right_operation) = right.peek_right_operation() {
-            if right_operation.priority < operator.priority {
+            if right_operation.priority() < operator.priority {
                 right.move_right_operation(&mut new_segment);
             } else {
                 break;
@@ -360,20 +401,46 @@ impl Segment {
     }
 }
 
-fn parse_single_operator(
-    side: Direction,
-) -> impl Fn(Span) -> IResult<Span, &'static OrderedSingleOperator<'static>> {
+fn parse_single_operator(side: Direction) -> impl Fn(Span) -> IResult<Span, SingleOperatorData> {
     // Parse a single operator
     // Example: !, -, +, etc
+    // This also includes function calls and array / object indexing (on the right side)
 
     move |input: Span| {
-        let (input, operator) = vec_alt(
+        let mut single_parser = vec_alt(
             SINGLE_OPERATORS
                 .iter()
                 .filter(|o| o.side == side)
-                .map(|o| Box::new(map(tag(o.string), move |_| o)))
+                .map(|o| {
+                    Box::new(map(tag(o.string), move |_| {
+                        SingleOperatorData::Standalone(o)
+                    }))
+                })
                 .collect::<Vec<_>>(),
-        )(input)?;
+        );
+
+        let (input, operator) = match side {
+            Direction::Left => single_parser(input),
+            Direction::Right => alt((
+                single_parser,
+                map(
+                    delimited(
+                        tuple((tag("("), ws)),
+                        separated_list0(tuple((ws, tag(","), ws)), parse_expression),
+                        tuple((ws, tag(")"))),
+                    ),
+                    |o| SingleOperatorData::Call(o),
+                ),
+                map(
+                    delimited(
+                        tuple((tag("["), ws)),
+                        parse_expression,
+                        tuple((ws, tag("]"))),
+                    ),
+                    |o| SingleOperatorData::Get(o),
+                ),
+            ))(input),
+        }?;
         let (input, _) = ws(input)?;
 
         Ok((input, operator))
@@ -422,23 +489,16 @@ fn parse_operator(input: Span) -> IResult<Span, OrderedOperator> {
 }
 
 fn parse_operator_and_segment(input: Span) -> IResult<Span, (OrderedOperator, Segment)> {
-    let input_copy = input.clone();
     let (input, _) = ws(input)?;
     let (input, operator) = parse_operator(input)?;
     let (input, _) = ws(input)?;
     // allow calls if operator has a higher priority than the call operator
     let call_priority = 9;
     let used_rules = match operator.priority {
-        p if p > call_priority => ExpressionParseRules::default(),
+        p if p < call_priority => ExpressionParseRules::default(),
         _ => ExpressionParseRules::default().with_call(false),
     };
     let (input, segment) = parse_segment(used_rules)(input)?;
-    println!(
-        "{:?} -> {:?}, rem: {}",
-        input_copy.fragment(),
-        segment,
-        input.fragment()
-    );
     Ok((input, (operator, segment)))
 }
 
