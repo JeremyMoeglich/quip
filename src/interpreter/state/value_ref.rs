@@ -6,8 +6,8 @@ use std::{
 use num::ToPrimitive;
 
 use crate::{
-    ast::{Operator, SingleOperation},
     interpreter::access::interpret_access,
+    parser::ast::{Operator, SingleOperation},
 };
 
 use super::value::value::Value;

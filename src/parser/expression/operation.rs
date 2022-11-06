@@ -2,15 +2,16 @@ use lazy_static::lazy_static;
 use nom::{
     branch::alt,
     bytes::complete::tag,
+    character::complete::char,
     combinator::map,
     multi::separated_list0,
     sequence::{delimited, tuple},
     IResult,
 };
 
-use crate::{
+use crate::parser::{
     ast::{Expression, Literal, Operator, SingleOperation},
-    parser::utils::{vec_alt, ws, Span},
+    utils::{vec_alt, ws, Span},
 };
 
 use super::{parse_expression, parse_expression_with_rule, ExpressionParseRules};
@@ -199,7 +200,7 @@ static SINGLE_OPERATORS: [OrderedSingleOperator; 6] = [
         side: Direction::Right,
     },
     OrderedSingleOperator {
-        string: "...",
+        string: "*",
         operator: SingleOperation::Spread,
         priority: 7,
         side: Direction::Left,
@@ -425,17 +426,17 @@ fn parse_single_operator(side: Direction) -> impl Fn(Span) -> IResult<Span, Sing
                 single_parser,
                 map(
                     delimited(
-                        tuple((tag("("), ws)),
-                        separated_list0(tuple((ws, tag(","), ws)), parse_expression),
-                        tuple((ws, tag(")"))),
+                        tuple((char('('), ws)),
+                        separated_list0(tuple((ws, char(','), ws)), parse_expression),
+                        tuple((ws, char(')'))),
                     ),
                     |o| SingleOperatorData::Call(o),
                 ),
                 map(
                     delimited(
-                        tuple((tag("["), ws)),
+                        tuple((char('['), ws)),
                         parse_expression,
-                        tuple((ws, tag("]"))),
+                        tuple((ws, char(']'))),
                     ),
                     |o| SingleOperatorData::Get(o),
                 ),

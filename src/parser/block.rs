@@ -1,10 +1,10 @@
 use nom::{
-    bytes::complete::tag,
     sequence::{delimited, tuple},
     IResult,
+    character::complete::char
 };
 
-use crate::ast::CodeBlock;
+use crate::parser::ast::CodeBlock;
 
 use super::{
     parse_code,
@@ -12,5 +12,5 @@ use super::{
 };
 
 pub fn parse_block(input: Span) -> IResult<Span, CodeBlock> {
-    delimited(tuple((tag("{"), ws)), parse_code, tuple((ws, tag("}"))))(input)
+    delimited(tuple((char('{'), ws)), parse_code, tuple((ws, char('}'))))(input)
 }

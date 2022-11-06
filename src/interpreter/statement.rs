@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Statement};
+use crate::parser::ast::{Expression, Statement};
 
 use super::{
     expression::interpret_expression,
@@ -55,11 +55,12 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Optio
             state.set_new_variable(name, value);
             None
         }
-        Statement::Function(name, parameters, body) => {
+        Statement::Function(name, _generics, parameters, _return_type, body) => {
             let function = Function {
                 name: name.clone(),
                 parameters: parameters.iter().map(|(name, _)| name.clone()).collect(), // TODO: type annotations
                 body: body.clone(),
+                return_type: "TODO".to_string(),
                 outer_state: state.clone(),
             };
             state.set_new_variable(name, ValueRef::new(Value::Function(function)));

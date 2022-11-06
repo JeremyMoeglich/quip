@@ -34,7 +34,7 @@ impl Point {
         // not defining a type is strict inferrence (like _) so this function only accepts int
         Point { x: x, y: y } 
     }
-
+    
     fn new2(x: any, y: any) -> any { 
         // this function accepts any type that might be an int so for example (string | int)
         // note that the return type is Point, not any
@@ -53,7 +53,7 @@ impl Point {
 //    fn new2(x: any, y: any) {
 //        Point { x, y } 
 //    }
-//} // Classes are not that important in quip, they are just syntactic sugar for structs (and they are not even implemented yet)
+//} // Classes are not that important in quip, they are just syntactic sugar for structs with impl (so they are not a priority)
 
 enum Color {
     Red,
@@ -61,11 +61,5 @@ enum Color {
     Blue
 }
 
-type Color = "Red" | "Green" | "Blue"; // the union type is different, but can usually be used in the same way
+//type Color = "Red" | "Green" | "Blue"; // the union type is different, but can usually be used in the same way
 
-// The following is the same as the enum above
-type Color = {
-    Red: (),
-    Green: (),
-    Blue: ()
-}

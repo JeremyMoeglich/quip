@@ -1,6 +1,6 @@
 use crate::{
-    ast::Literal,
     interpreter::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
+    parser::ast::Literal,
 };
 
 use super::string::interpret_string;

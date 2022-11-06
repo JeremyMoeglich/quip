@@ -1,22 +1,22 @@
 use nom::{
-    bytes::complete::tag,
+    character::complete::char,
     multi::separated_list0,
     sequence::{delimited, tuple},
     IResult,
 };
 
-use crate::{
+use crate::parser::{
     ast::Expression,
-    parser::utils::{ws, Span},
+    utils::{ws, Span},
 };
 
 use super::parse_expression;
 
 pub fn parse_list(input: Span) -> IResult<Span, Expression> {
     let (input, value) = delimited(
-        tuple((tag("["), ws)),
-        separated_list0(tuple((ws, tag(","), ws)), parse_expression),
-        tuple((ws, tag("]"))),
+        tuple((char('['), ws)),
+        separated_list0(tuple((ws, char(','), ws)), parse_expression),
+        tuple((ws, char(']'))),
     )(input)?;
     Ok((input, Expression::List(value)))
 }

@@ -5,7 +5,7 @@ mod string;
 
 use nom::{branch::alt, combinator::map, IResult};
 
-use crate::{ast::Literal, parser::utils::Span};
+use crate::{parser::{utils::Span, ast::Literal}};
 
 pub fn parse_literal(input: Span) -> IResult<Span, Literal> {
     alt((

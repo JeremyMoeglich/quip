@@ -1,15 +1,10 @@
-mod ast;
-mod interpreter;
-mod parser;
-mod tests;
+use lang_impl::parser;
 
 fn main() {
-    let test_content = include_str!("./example_files/2.qp");
+    let test_content = include_str!("./example_files/types.qp");
 
-    match interpreter::interpret_code(test_content, vec![]) {
-        Ok(_state) => (),
-        Err(error) => {
-            println!("{}", error);
-        }
+    match parser::simple_parse(test_content) {
+        Ok(block) => println!("{:#?}", block),
+        Err(error) => println!("{}", error),
     }
 }

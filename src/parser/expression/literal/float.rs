@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::tag,
+    character::complete::char,
     character::complete::{digit0, digit1},
     combinator::opt,
     sequence::tuple,
@@ -12,11 +12,11 @@ use crate::parser::utils::Span;
 pub fn parse_float(input: Span) -> IResult<Span, f64> {
     let (input, (left_digits, _, right_digits, exponent)) = tuple((
         digit1,
-        tag("."),
+        char('.'),
         digit0,
         opt(tuple((
-            alt((tag("e"), tag("E"))),
-            opt(alt((tag("-"), tag("+")))),
+            alt((char('e'), char('E'))),
+            opt(alt((char('-'), char('+')))),
             digit1,
         ))),
     ))(input)?;
@@ -24,7 +24,7 @@ pub fn parse_float(input: Span) -> IResult<Span, f64> {
     if let Some((_, sign, exponent)) = exponent {
         let mut exponent = exponent.fragment().to_string();
         if let Some(sign) = sign {
-            exponent = format!("{}{}", sign.fragment(), exponent);
+            exponent = format!("{}{}", sign, exponent);
         }
         value = format!("{}e{}", value, exponent);
     }

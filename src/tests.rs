@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::interpreter::interpret_code;
     use pretty_assertions::assert_eq;
+
+    use crate::interpret_code;
 
     #[test]
     fn reference_array() {

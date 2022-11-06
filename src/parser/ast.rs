@@ -6,13 +6,28 @@ pub enum Statement {
     Return(Expression),
     Assignment(Expression, Expression),
     Declaration(TypedIdentifier, Mutable, Option<Expression>),
-    Function(Identifier, Vec<TypedIdentifier>, CodeBlock),
+    Function(
+        Identifier,
+        Vec<TypeGeneric>,
+        Vec<TypedIdentifier>,
+        TypeExpression,
+        CodeBlock,
+    ),
     If(Expression, CodeBlock, CodeBlock),
     While(Expression, CodeBlock),
     For(TypedIdentifier, Expression, CodeBlock),
     Scope(CodeBlock),
     Expression(Expression),
     StopReturn(Box<Statement>),
+    Struct(Identifier, Vec<TypeGeneric>, Vec<TypedIdentifier>),
+    Enum(Identifier, Vec<TypeGeneric>, Vec<EnumOption>),
+    Impl(
+        Identifier,
+        Option<Identifier>,
+        //Vec<TypeGeneric>, // TODO: Implement generics for impls
+        Vec<Statement>,
+    ),
+    TypeAlias(Identifier, Vec<TypeGeneric>, TypeExpression),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +40,7 @@ pub enum Expression {
     Operation(Box<Expression>, Operator, Box<Expression>),
     List(Vec<Expression>),
     Block(CodeBlock),
+    Object(Option<Identifier>, Vec<(Identifier, Expression)>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,10 +93,13 @@ pub enum Operator {
     Access,
 }
 
-pub type TypedIdentifier = (Identifier, String); // TODO: Type
+pub type TypedIdentifier = (Identifier, TypeExpression);
+pub type TypeGeneric = (String, TypeExpression);
 pub type Identifier = String;
 pub type CodeBlock = Vec<Statement>;
 pub type Mutable = bool;
+pub type TypeObject = Vec<(Identifier, TypeExpression)>;
+pub type EnumOption = (Identifier, Vec<TypeExpression>);
 
 // Types
 
@@ -89,4 +108,19 @@ pub enum TypeExpression {
     Variable(Identifier),
     Array(Box<TypeExpression>),
     Union(Vec<TypeExpression>),
+    Object(TypeObject),
+    Intersection(Vec<TypeExpression>),
+    Tuple(Vec<TypeExpression>), // TODO: Check if this is necessary
+    Infer,
+    Empty,
+    TypeLiteral(TypeLiteral),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeLiteral {
+    Integer(BigInt),
+    Float(f64),
+    String(String),
+    Boolean(bool),
+    None,
 }

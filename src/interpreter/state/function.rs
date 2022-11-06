@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::{ast::CodeBlock, interpreter::code_block::interpret_code_block};
+use crate::{interpreter::code_block::interpret_code_block, parser::ast::CodeBlock};
 
 use super::{program_state::ProgramState, value_ref::ValueRef};
 
@@ -9,6 +9,7 @@ pub struct Function {
     pub name: String,
     pub parameters: Vec<String>,
     pub body: CodeBlock,
+    pub return_type: String,
     pub outer_state: ProgramState,
 }
 

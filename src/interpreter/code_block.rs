@@ -2,7 +2,7 @@ use super::{
     state::{program_state::ProgramState, value_ref::ValueRef},
     statement::interpret_statement,
 };
-use crate::ast::CodeBlock;
+use crate::parser::ast::CodeBlock;
 
 pub fn interpret_code_block(
     code_block: &CodeBlock,

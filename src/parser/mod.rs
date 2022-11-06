@@ -1,18 +1,19 @@
-mod assignment;
+pub mod ast;
 mod block;
-mod declaration;
+mod error;
 pub mod expression;
-mod function;
 mod identifier;
-mod if_statement;
 mod statement;
+mod type_expression;
 mod utils;
 
 use nom::{multi::many0, IResult};
 
-use crate::{ast::CodeBlock, parser::utils::Span};
+use crate::parser::utils::Span;
 
 use self::{
+    ast::CodeBlock,
+    error::{create_fancy_error, create_fancy_error_span},
     statement::parse_statement,
     utils::{new_span, ws},
 };
@@ -23,17 +24,14 @@ pub fn parse_code(input: Span) -> IResult<Span, CodeBlock> {
     Ok((input, out))
 }
 
-pub fn simple_parse(input: &str) -> Result<CodeBlock, nom::Err<nom::error::Error<Span>>> {
-    let input = new_span(input);
+pub fn simple_parse(code: &str) -> Result<CodeBlock, String> {
+    let input = new_span(code);
     let iresult = parse_code(input);
     match iresult {
-        Ok((input, expression)) => match input.fragment() {
+        Ok((input2, expression)) => match input2.fragment() {
             &"" => Ok(expression),
-            _ => Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            ))),
+            _ => Err(create_fancy_error_span(&code, input2)),
         },
-        Err(err) => Err(err),
+        Err(err) => Err(create_fancy_error(&code, err)),
     }
 }

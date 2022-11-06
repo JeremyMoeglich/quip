@@ -1,7 +1,6 @@
-use crate::{
-    ast::Expression,
-    interpreter::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
-};
+use crate::{interpreter::state::{
+    program_state::ProgramState, value::value::Value, value_ref::ValueRef,
+}, parser::ast::Expression};
 
 use super::interpret_expression;
 

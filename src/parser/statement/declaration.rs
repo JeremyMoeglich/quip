@@ -3,13 +3,14 @@ use nom::{
     combinator::{map, opt},
     sequence::tuple,
     IResult,
+    character::complete::char
 };
 
-use crate::ast::Statement;
-
-use super::{
+use crate::parser::{
+    ast::{Statement, TypeExpression},
     expression::parse_expression,
     identifier::parse_identifier,
+    type_expression::parse_type_expression,
     utils::{ws, ws1, Span},
 };
 
@@ -21,17 +22,20 @@ pub fn parse_declaration(input: Span) -> IResult<Span, Statement> {
         None => false,
     })(input)?;
     let (input, identifier) = parse_identifier(input)?;
+    let (input, type_) = map(
+        opt(tuple((ws, char(':'), ws, parse_type_expression))),
+        |v| match v {
+            Some((_, _, _, type_)) => type_,
+            None => TypeExpression::Infer,
+        },
+    )(input)?;
     let (input, _) = ws(input)?;
-    let (input, expression_opt) = map(opt(tuple((tag("="), ws, parse_expression))), |v| match v {
+    let (input, expression_opt) = map(opt(tuple((char('='), ws, parse_expression))), |v| match v {
         Some((_, _, expression)) => Some(expression),
         None => None,
     })(input)?;
     Ok((
         input,
-        Statement::Declaration(
-            (identifier, "some_empty_type".to_string()),
-            mutable,
-            expression_opt,
-        ),
+        Statement::Declaration((identifier, type_), mutable, expression_opt),
     ))
 }

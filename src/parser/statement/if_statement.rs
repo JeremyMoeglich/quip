@@ -6,9 +6,8 @@ use nom::{
     IResult,
 };
 
-use crate::ast::{CodeBlock, Expression, Statement};
-
-use super::{
+use crate::parser::{
+    ast::{CodeBlock, Expression, Statement},
     block::parse_block,
     expression::parse_expression,
     utils::{ws, ws1, Span},

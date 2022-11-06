@@ -1,5 +1,6 @@
 mod list;
 mod literal;
+mod object;
 mod operation;
 mod variable;
 
@@ -11,41 +12,41 @@ use nom::{
     IResult,
 };
 
-use crate::{ast, parser::utils::Span};
+use crate::parser::utils::Span;
 
 use self::{
-    list::parse_list, literal::parse_literal, operation::parse_operation, variable::parse_variable,
+    list::parse_list, literal::parse_literal, object::parse_object, operation::parse_operation,
+    variable::parse_variable,
 };
 
-use super::{parse_code, utils::ws};
+use super::{
+    ast::Expression,
+    parse_code,
+    utils::{acond, ws},
+};
 
-pub fn parse_expression(input: Span) -> IResult<Span, crate::ast::Expression> {
+pub fn parse_expression(input: Span) -> IResult<Span, Expression> {
     parse_expression_with_rule(ExpressionParseRules::default())(input)
 }
 
 pub fn parse_expression_with_rule(
     rules: ExpressionParseRules,
-) -> impl Fn(Span) -> IResult<Span, ast::Expression> {
+) -> impl Fn(Span) -> IResult<Span, Expression> {
     move |input: Span| {
         let (input, expression) = alt((
-            |input2: _| match rules.allow_operation {
-                true => parse_operation(rules.clone())(input2),
-                false => Err(nom::Err::Error(nom::error::Error::new(
-                    input2,
-                    nom::error::ErrorKind::Alt,
-                ))),
-            },
+            acond(rules.allow_operation, parse_operation(rules.clone())),
             parse_list,
             delimited(
                 tuple((char('('), ws)),
                 parse_expression,
                 tuple((ws, char(')'))),
             ),
+            parse_object,
             map(
                 delimited(tuple((char('{'), ws)), parse_code, tuple((ws, char('}')))),
-                |code| ast::Expression::Block(code),
+                |code| Expression::Block(code),
             ),
-            map(parse_literal, |literal| ast::Expression::Literal(literal)),
+            map(parse_literal, |literal| Expression::Literal(literal)),
             parse_variable,
         ))(input)?;
         Ok((input, expression))
@@ -81,9 +82,9 @@ impl ExpressionParseRules {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::parser::{
         ast::{Expression, FancyStringFragment, Literal, Operator},
-        parser::utils::new_span,
+        utils::new_span,
     };
     use pretty_assertions::assert_eq;
 

@@ -8,9 +8,9 @@ use nom::{
     IResult,
 };
 
-use crate::{
+use crate::parser::{
     ast::{Expression, FancyString, FancyStringFragment},
-    parser::utils::Span,
+    utils::Span,
 };
 
 // largely taken from here https://github.com/Geal/nom/blob/main/examples/string.rs
