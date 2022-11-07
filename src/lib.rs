@@ -6,6 +6,7 @@ use parser::simple_parse;
 
 pub mod interpreter;
 pub mod parser;
+pub mod analysis;
 
 mod tests;
 
@@ -41,6 +42,6 @@ pub fn interpret_code(code: &str, args: Vec<String>) -> Result<(ProgramState, Va
             },
             Err(error) => Err(error),
         },
-        Err(error) => Err(error.to_string()),
+        Err(error) => Err(error),
     }
 }

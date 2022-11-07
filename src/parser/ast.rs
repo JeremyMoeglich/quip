@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use num::bigint::BigInt;
 
 #[derive(Debug, Clone, PartialEq)]
