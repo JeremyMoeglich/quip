@@ -112,17 +112,17 @@ fn parse_string_expression(input: Span) -> IResult<Span, Expression> {
     )(input)
 }
 
-fn parse_normal_string(input: Span) -> IResult<Span, FancyString> {
+fn parse_string_data(input: Span) -> IResult<Span, Vec<StringFragment>> {
     let string_content = |kind: StringKind| {
         fold_many0(
             parse_fragment(kind),
             Vec::new,
             |mut acc: FancyString, fragment| {
-                let add_string = |acc: &mut FancyString, string: String| {
-                    if let Some(FancyStringFragment::LiteralString(s)) = acc.last_mut() {
+                let add_string = |acc: &mut Vec<StringFragment>, string: String| {
+                    if let Some(StringFragment::LiteralString(s)) = acc.last_mut() {
                         *s = format!("{}{}", s, string);
                     } else {
-                        acc.push(FancyStringFragment::LiteralString(string));
+                        acc.push(StringFragment::LiteralString(string));
                     }
                 };
                 match fragment {
@@ -144,6 +144,6 @@ fn parse_normal_string(input: Span) -> IResult<Span, FancyString> {
     ))(input)
 }
 
-pub fn parse_string(input: Span) -> IResult<Span, FancyString> {
-    parse_normal_string(input) // TODO: add raw string support
+pub fn parse_string(input: Span) -> IResult<Span, Expression> {
+    let (input, string) = parse_string_data(input)?;
 }

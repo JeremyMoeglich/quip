@@ -32,6 +32,7 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Literal),
+    FancyString(FancyString),
     SingleOperation(SingleOperation, Box<Expression>),
     Call(Box<Expression>, Vec<Expression>),
     Get(Box<Expression>, Box<Expression>),
@@ -56,7 +57,7 @@ pub enum SingleOperation {
 pub enum Literal {
     Integer(BigInt),
     Float(f64),
-    String(FancyString),
+    String(String),
     Boolean(bool),
     None,
 }
@@ -64,7 +65,7 @@ pub enum Literal {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FancyStringFragment {
     Expression(Expression),
-    LiteralString(String),
+    Literal(Literal),
     FormatPlaceholder,
 }
 

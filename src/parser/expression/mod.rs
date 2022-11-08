@@ -83,7 +83,7 @@ impl ExpressionParseRules {
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        ast::{Expression, FancyStringFragment, Literal, Operator},
+        ast::{Expression, FancyStringFragment, Operator},
         utils::new_span,
     };
     use pretty_assertions::assert_eq;
@@ -95,9 +95,9 @@ mod tests {
         let tests = vec![
             (
                 r#""test""#,
-                Expression::Literal(Literal::String(vec![FancyStringFragment::LiteralString(
+                Expression::FancyString(vec![FancyStringFragment::LiteralString(
                     "test".to_string(),
-                )])),
+                )]),
             ),
             (
                 "obj!.field(5, 2)",
