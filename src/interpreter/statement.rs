@@ -1,4 +1,4 @@
-use crate::parser::ast::{Expression, Statement};
+use crate::parser::fst::{Expression, Statement};
 
 use super::{
     expression::interpret_expression,

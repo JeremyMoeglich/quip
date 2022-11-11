@@ -1,7 +1,7 @@
 use nom::{character::complete::char, IResult};
 
 use crate::parser::{
-    ast::Statement,
+    fst::Statement,
     expression::parse_expression,
     utils::{ws, Span},
 };

@@ -7,7 +7,7 @@ mod single_operation;
 mod string;
 mod variable;
 
-use crate::parser::ast::Expression;
+use crate::parser::fst::Expression;
 
 use self::{
     call::interpret_call, get::interpret_get, list::interpret_list, literal::interpret_literal,

@@ -16,7 +16,7 @@ use nom::{
     IResult,
 };
 
-use crate::parser::ast::Statement;
+use crate::parser::fst::Statement;
 
 use self::{
     assignment::parse_assignment, declaration::parse_declaration, enum_statement::parse_enum,

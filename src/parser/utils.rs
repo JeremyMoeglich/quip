@@ -6,12 +6,15 @@ use nom::{
     branch::alt,
     bytes::{complete::is_not, complete::tag},
     character::complete::{multispace1, not_line_ending},
+    combinator::map,
     multi::{many0, many1},
     sequence::delimited,
     IResult,
 };
 
 use nom_locate::LocatedSpan;
+
+use super::fst::{Space, Whitespace};
 
 // Utils for parsing
 
@@ -21,29 +24,42 @@ pub fn new_span(input: &str) -> Span {
     Span::new_extra(input, ())
 }
 
-fn single_line_comment(input: Span) -> IResult<Span, Span> {
+fn single_line_comment(input: Span) -> IResult<Span, Space> {
     let (input, _) = tag("//")(input)?;
     let (input, comment) = not_line_ending(input)?;
-    Ok((input, comment))
+    Ok((input, Space::LineComment(comment.fragment())))
 }
 
-fn multi_line_comment(input: Span) -> IResult<Span, Span> {
+fn multi_line_comment(input: Span) -> IResult<Span, Space> {
     let comment_start = "/*";
     let comment_end = "*/";
     let (input, _) = delimited(tag(comment_start), is_not(comment_end), tag(comment_end))(input)?;
     Ok((input, input))
 }
 
-fn comment(input: Span) -> IResult<Span, Span> {
+fn comment(input: Span) -> IResult<Span, Space> {
     alt((single_line_comment, multi_line_comment))(input)
 }
 
-pub fn ws(input: Span) -> IResult<Span, Span> {
-    let (input, _) = many0(alt((multispace1, comment)))(input)?;
+pub fn ws(input: Span) -> IResult<Span, Whitespace> {
+    let (input, _) = many0(alt((
+        map(multispace1, |s: Span| {
+            let mut total = 0;
+            for c in s.fragment().chars() {
+                if c == '\t' {
+                    total += 4;
+                } else {
+                    total += 1;
+                }
+            }
+            Space::Blank(total)
+        }),
+        comment,
+    )))(input)?;
     Ok((input, input))
 }
 
-pub fn ws1(input: Span) -> IResult<Span, Span> {
+pub fn ws1(input: Span) -> IResult<Span, Whitespace> {
     let (input, _) = many1(alt((comment, multispace1)))(input)?;
     Ok((input, input))
 }
@@ -67,7 +83,9 @@ where
     }
 }
 
-pub fn ws_delimited<'a, O, F>(parser: F) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, O>
+pub fn ws_delimited<'a, O, F>(
+    parser: F,
+) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, (Space, O, Space)>
 where
     F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
 {

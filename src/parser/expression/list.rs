@@ -6,7 +6,7 @@ use nom::{
 };
 
 use crate::parser::{
-    ast::Expression,
+    fst::Expression,
     utils::{ws, Span},
 };
 

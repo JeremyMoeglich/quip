@@ -1,7 +1,7 @@
 use nom::{character::complete::char, multi::separated_list0, sequence::tuple, IResult};
 
 use crate::parser::{
-    ast::TypeExpression,
+    fst::TypeExpression,
     identifier::parse_identifier,
     utils::{ws, ws_delimited, Span},
 };

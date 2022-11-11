@@ -1,4 +1,4 @@
-pub mod ast;
+pub mod fst;
 mod block;
 mod error;
 pub mod expression;
@@ -12,7 +12,7 @@ use nom::{multi::many0, IResult};
 use crate::parser::utils::Span;
 
 use self::{
-    ast::CodeBlock,
+    fst::CodeBlock,
     error::{create_fancy_error, create_fancy_error_span},
     statement::parse_statement,
     utils::{new_span, ws},

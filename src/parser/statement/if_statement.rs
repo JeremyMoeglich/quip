@@ -7,7 +7,7 @@ use nom::{
 };
 
 use crate::parser::{
-    ast::{CodeBlock, Expression, Statement},
+    fst::{CodeBlock, Expression, Statement},
     block::parse_block,
     expression::parse_expression,
     utils::{ws, ws1, Span},

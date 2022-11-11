@@ -2,6 +2,7 @@ mod list;
 mod literal;
 mod object;
 mod operation;
+mod stringify;
 mod variable;
 
 use nom::{
@@ -20,7 +21,7 @@ use self::{
 };
 
 use super::{
-    ast::Expression,
+    fst::Expression,
     parse_code,
     utils::{acond, ws},
 };
@@ -83,7 +84,7 @@ impl ExpressionParseRules {
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        ast::{Expression, FancyStringFragment, Operator},
+        fst::{Expression, FancyStringFragment, Operator},
         utils::new_span,
     };
     use pretty_assertions::assert_eq;

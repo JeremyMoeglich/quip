@@ -1,14 +1,14 @@
 use nom::{
     bytes::complete::tag,
+    character::complete::char,
     combinator::{map, opt},
     multi::many0,
     sequence::tuple,
     IResult,
-    character::complete::char
 };
 
 use crate::parser::{
-    ast::Statement,
+    fst::Statement,
     identifier::parse_identifier,
     utils::{ws, ws1, Span},
 };

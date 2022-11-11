@@ -1,10 +1,10 @@
 use nom::{
+    character::complete::char,
     sequence::{delimited, tuple},
     IResult,
-    character::complete::char
 };
 
-use crate::parser::ast::CodeBlock;
+use crate::parser::fst::CodeBlock;
 
 use super::{
     parse_code,

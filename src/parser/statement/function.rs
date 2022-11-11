@@ -8,7 +8,7 @@ use nom::{
 };
 
 use crate::parser::{
-    ast::{Statement, TypeExpression},
+    fst::{Statement, TypeExpression},
     block::parse_block,
     identifier::parse_identifier,
     type_expression::parse_type_expression,

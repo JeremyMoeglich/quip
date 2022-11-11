@@ -9,7 +9,8 @@ use nom::{
 };
 
 use crate::parser::{
-    ast::{Expression, FancyString, FancyStringFragment},
+    fst::{Expression, FancyStringFragment, Literal},
+    expression::stringify::stringify_expression,
     utils::Span,
 };
 
@@ -112,17 +113,17 @@ fn parse_string_expression(input: Span) -> IResult<Span, Expression> {
     )(input)
 }
 
-fn parse_string_data(input: Span) -> IResult<Span, Vec<StringFragment>> {
+fn parse_string_data(input: Span) -> IResult<Span, Vec<FancyStringFragment>> {
     let string_content = |kind: StringKind| {
         fold_many0(
             parse_fragment(kind),
             Vec::new,
-            |mut acc: FancyString, fragment| {
-                let add_string = |acc: &mut Vec<StringFragment>, string: String| {
-                    if let Some(StringFragment::LiteralString(s)) = acc.last_mut() {
+            |mut acc: Vec<FancyStringFragment>, fragment| {
+                let add_string = |acc: &mut Vec<FancyStringFragment>, string: String| {
+                    if let Some(FancyStringFragment::LiteralString(s)) = acc.last_mut() {
                         *s = format!("{}{}", s, string);
                     } else {
-                        acc.push(StringFragment::LiteralString(string));
+                        acc.push(FancyStringFragment::LiteralString(string));
                     }
                 };
                 match fragment {
@@ -145,5 +146,36 @@ fn parse_string_data(input: Span) -> IResult<Span, Vec<StringFragment>> {
 }
 
 pub fn parse_string(input: Span) -> IResult<Span, Expression> {
-    let (input, string) = parse_string_data(input)?;
+    let (input, fragments) = parse_string_data(input)?;
+    Ok((
+        input,
+        match fragments.len() {
+            0 => Expression::Literal(Literal::String("".to_string())),
+            1 => match fragments[0] {
+                FancyStringFragment::LiteralString(l) => Expression::Literal(Literal::String(l)),
+                FancyStringFragment::Expression(e) => stringify_expression(e),
+                FancyStringFragment::FormatPlaceholder => unimplemented!(),
+                _ => Expression::FancyString(fragments),
+            },
+            _ => Expression::FancyString(fragments),
+        },
+    ))
+}
+
+pub fn parse_string_literal(input: Span) -> IResult<Span, String> {
+    let (input, fragments) = parse_string_data(input)?;
+    match fragments.len() {
+        0 => Ok((input, "".to_string())),
+        1 => match fragments[0] {
+            FancyStringFragment::LiteralString(l) => Ok((input, l)),
+            _ => Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::IsNot,
+            ))),
+        },
+        _ => Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::IsNot,
+        ))),
+    }
 }

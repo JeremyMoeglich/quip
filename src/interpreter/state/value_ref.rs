@@ -7,7 +7,7 @@ use num::ToPrimitive;
 
 use crate::{
     interpreter::access::interpret_access,
-    parser::ast::{Operator, SingleOperation},
+    parser::fst::{Operator, SingleOperation},
 };
 
 use super::value::value::Value;

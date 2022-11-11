@@ -10,7 +10,7 @@ use nom::{
 };
 
 use crate::parser::{
-    ast::{Expression, Literal, Operator, SingleOperation},
+    fst::{Expression, Literal, Operator, SingleOperation},
     utils::{vec_alt, ws, Span},
 };
 

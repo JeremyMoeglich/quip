@@ -1,6 +1,6 @@
 use nom::IResult;
 
-use crate::parser::{ast::Expression, identifier::parse_identifier, utils::Span};
+use crate::parser::{fst::Expression, identifier::parse_identifier, utils::Span};
 
 pub fn parse_variable(input: Span) -> IResult<Span, Expression> {
     let (input, name) = parse_identifier(input)?;

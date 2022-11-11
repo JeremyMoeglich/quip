@@ -1,6 +1,6 @@
 use num::BigInt;
 
-use crate::parser::ast::{Identifier, Operator, SingleOperation, TypeExpression};
+use crate::parser::fst::{Identifier, Operator, SingleOperation, TypeExpression};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedExpression {

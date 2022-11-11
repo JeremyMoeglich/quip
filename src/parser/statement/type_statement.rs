@@ -1,7 +1,7 @@
 use nom::{bytes::complete::tag, character::complete::char, IResult};
 
 use crate::parser::{
-    ast::Statement,
+    fst::Statement,
     identifier::parse_identifier,
     type_expression::parse_type_expression,
     utils::{ws, ws1, Span},

@@ -1,6 +1,7 @@
-use crate::{interpreter::state::{
-    program_state::ProgramState, value::value::Value, value_ref::ValueRef,
-}, parser::ast::{FancyString, FancyStringFragment}};
+use crate::{
+    interpreter::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
+    parser::fst::{FancyString, FancyStringFragment},
+};
 
 use super::interpret_expression;
 

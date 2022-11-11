@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::parser::ast::Operator;
+use crate::parser::fst::Operator;
 
 use super::state::{value::value::Value, value_ref::ValueRef};
 

@@ -4,9 +4,9 @@ use interpreter::{
 };
 use parser::simple_parse;
 
+pub mod analysis;
 pub mod interpreter;
 pub mod parser;
-pub mod analysis;
 
 mod tests;
 

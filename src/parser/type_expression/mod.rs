@@ -6,7 +6,7 @@ use nom::{
     sequence::delimited, IResult,
 };
 
-use crate::parser::{ast::TypeExpression, utils::Span};
+use crate::parser::{fst::TypeExpression, utils::Span};
 
 use self::{array::parse_type_array, object::parse_type_object};
 

@@ -1,13 +1,13 @@
 use nom::{
     bytes::complete::tag,
+    character::complete::char,
     combinator::{map, opt},
     sequence::tuple,
     IResult,
-    character::complete::char
 };
 
 use crate::parser::{
-    ast::{Statement, TypeExpression},
+    fst::{Statement, TypeExpression},
     expression::parse_expression,
     identifier::parse_identifier,
     type_expression::parse_type_expression,
@@ -30,10 +30,11 @@ pub fn parse_declaration(input: Span) -> IResult<Span, Statement> {
         },
     )(input)?;
     let (input, _) = ws(input)?;
-    let (input, expression_opt) = map(opt(tuple((char('='), ws, parse_expression))), |v| match v {
-        Some((_, _, expression)) => Some(expression),
-        None => None,
-    })(input)?;
+    let (input, expression_opt) =
+        map(opt(tuple((char('='), ws, parse_expression))), |v| match v {
+            Some((_, _, expression)) => Some(expression),
+            None => None,
+        })(input)?;
     Ok((
         input,
         Statement::Declaration((identifier, type_), mutable, expression_opt),

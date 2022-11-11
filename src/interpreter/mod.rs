@@ -5,7 +5,7 @@ mod native_functions;
 pub mod state;
 mod statement;
 
-use crate::parser::ast::CodeBlock;
+use crate::parser::fst::CodeBlock;
 
 use self::{
     code_block::interpret_code_block,
