@@ -11,6 +11,7 @@ use nom::{
 
 use crate::{
     fst::{Expression, Literal, Operator, SingleOperation},
+    lexer::Token,
     utils::{vec_alt, ws, Span},
 };
 
@@ -23,8 +24,8 @@ enum Direction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct OrderedOperator<'a> {
-    string: &'a str,
+struct OrderedOperator {
+    token: Token,
     operator: Operator,
     priority: u8,
     allow_repeat: bool,
@@ -32,8 +33,8 @@ struct OrderedOperator<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct OrderedSingleOperator<'a> {
-    string: &'a str,
+struct OrderedSingleOperator {
+    token: Token,
     operator: SingleOperation,
     priority: u8,
     side: Direction,
@@ -41,126 +42,126 @@ struct OrderedSingleOperator<'a> {
 
 static OPERATORS: [OrderedOperator; 17] = [
     OrderedOperator {
-        string: "..",
+        token: Token::Range,
         operator: Operator::Range,
         priority: 0,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "&&",
+        token: Token::And,
         operator: Operator::And,
         priority: 1,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "||",
+        token: Token::Or,
         operator: Operator::Or,
         priority: 1,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "==",
+        token: Token::Equal,
         operator: Operator::Equals,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "!=",
+        token: Token::NotEqual,
         operator: Operator::NotEquals,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "<",
+        token: Token::LessThan,
         operator: Operator::LessThan,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "<=",
+        token: Token::LessThanOrEqual,
         operator: Operator::LessThanOrEquals,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: ">",
+        token: Token::GreaterThan,
         operator: Operator::GreaterThan,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: ">=",
+        token: Token::GreaterThanOrEqual,
         operator: Operator::GreaterThanOrEquals,
         priority: 2,
         allow_repeat: false,
         direction: Direction::Right,
     },
     //OrderedOperator {
-    //    string: "??",
+    //    token: Token::NullCoalesce,
     //    operator: Operator::Coalesce,
     //    priority: 3,
     //    allow_repeat: true,
     //    direction: Direction::Right,
     //}, // This operator has a collision with the unwrap operator (?) so it is disabled for now
     OrderedOperator {
-        string: "+",
+        token: Token::Plus,
         operator: Operator::Add,
         priority: 4,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "-",
+        token: Token::Minus,
         operator: Operator::Subtract,
         priority: 4,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "*",
+        token: Token::Star,
         operator: Operator::Multiply,
         priority: 5,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "//",
+        token: Token::IntegerDivide,
         operator: Operator::IntDivide,
         priority: 5,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "/",
+        token: Token::Divide,
         operator: Operator::Divide,
         priority: 5,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "%",
+        token: Token::Modulo,
         operator: Operator::Modulo,
         priority: 5,
         allow_repeat: true,
         direction: Direction::Right,
     },
     OrderedOperator {
-        string: "**",
+        token: Token::Power,
         operator: Operator::Power,
         priority: 6,
         allow_repeat: true,
         direction: Direction::Left,
     },
     OrderedOperator {
-        string: ".",
+        token: Token::Dot,
         operator: Operator::Access,
         priority: 10,
         allow_repeat: true,
@@ -170,37 +171,37 @@ static OPERATORS: [OrderedOperator; 17] = [
 
 static SINGLE_OPERATORS: [OrderedSingleOperator; 6] = [
     OrderedSingleOperator {
-        string: "!",
+        token: "!",
         operator: SingleOperation::Not,
         priority: 8,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        string: "-",
+        token: "-",
         operator: SingleOperation::Negate,
         priority: 4,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        string: "+",
+        token: "+",
         operator: SingleOperation::Positive,
         priority: 4,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        string: "?",
+        token: "?",
         operator: SingleOperation::ErrorUnwrap,
         priority: 9,
         side: Direction::Right,
     },
     OrderedSingleOperator {
-        string: "!",
+        token: "!",
         operator: SingleOperation::Panic,
         priority: 9,
         side: Direction::Right,
     },
     OrderedSingleOperator {
-        string: "*",
+        token: "*",
         operator: SingleOperation::Spread,
         priority: 7,
         side: Direction::Left,
@@ -209,7 +210,7 @@ static SINGLE_OPERATORS: [OrderedSingleOperator; 6] = [
 
 lazy_static! {
     // Sort the operators by length, so that we can parse the longest operators first
-    static ref OPERATORS_BY_LENGTH: Vec<&'static OrderedOperator<'static>> = {
+    static ref OPERATORS_BY_LENGTH: Vec<&'static OrderedOperator> = {
         let mut operators: Vec<_> = OPERATORS.iter().collect();
         operators.sort_by(|a, b| b.string.len().cmp(&a.string.len()));
         operators
@@ -218,7 +219,7 @@ lazy_static! {
 
 #[derive(Debug, Clone, PartialEq)]
 enum SingleOperatorData {
-    Standalone(&'static OrderedSingleOperator<'static>),
+    Standalone(&'static OrderedSingleOperator),
     Call(Vec<Expression>),
     Get(Expression),
 }

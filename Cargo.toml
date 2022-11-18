@@ -3,5 +3,9 @@ name = "lang_impl"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = ["crates/*"]
+
+[dependencies]
+enum-kinds = "0.5.1"
+logos = "0.12.1"
+nom = "7.1.1"
+nom_locate = "4.0.0"

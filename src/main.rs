@@ -1,11 +1,8 @@
-use lang_impl::interpret_code;
+use quip::parser::parse;
+
 
 fn main() {
-    let test_content = include_str!("./example_files/types.qp");
-
-
-    match interpret_code(test_content, vec![]) {
-        Ok(block) => println!("{:#?}", block),
-        Err(error) => println!("{}", error),
-    }
+    let code = include_str!("./example_code/1.kld");
+    let fst = parse(code);
+    println!("{:#?}", fst);
 }
