@@ -31,7 +31,31 @@ pub enum SpacePart {
     MultiLineComment(String),
 }
 
-pub type Space = Vec<SpacePart>;
+#[derive(Debug, Clone, PartialEq)]
+pub struct Space {
+    pub space: Vec<SpacePart>
+}
+
+impl Space {
+    pub fn new(space: Vec<SpacePart>) -> Self {
+        Self { space }
+    }
+    pub fn has_comments(&self) -> bool {
+        self.space.iter().any(|space_part| match space_part {
+            SpacePart::SingleLineComment(_) => true,
+            SpacePart::MultiLineComment(_) => true,
+            _ => false,
+        })
+    }
+}
+
+impl Iterator for Space {
+    type Item = SpacePart;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.space.pop()
+    }
+}
+
 pub type Ident = String;
 
 #[derive(Debug, Clone, PartialEq)]

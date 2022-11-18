@@ -141,12 +141,12 @@ fn parse_space_part(input: TokenSlice) -> ParseResult<SpacePart> {
 
 pub fn ws0<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Space> {
     let (input, space) = many0(parse_space_part)(input)?;
-    Ok((input, space))
+    Ok((input, Space::new(space)))
 }
 
 pub fn ws1<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Space> {
     let (input, space) = many1(parse_space_part)(input)?;
-    Ok((input, space))
+    Ok((input, Space::new(space)))
 }
 
 pub fn force_eof<'a, T>(
