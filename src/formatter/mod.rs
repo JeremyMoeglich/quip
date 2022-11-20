@@ -6,6 +6,7 @@ mod code_block;
 mod lst_statement;
 mod utils;
 mod statement;
+mod expression;
 
 pub fn format_fst(fst: &Fst) -> String {
     let mut result = String::new();

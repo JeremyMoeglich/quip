@@ -1,11 +1,18 @@
 use crate::fst::CodeBlock;
 
-use super::{lst_statement::format_statements, utils::indent};
+use super::utils::{format_separated, Delimiter, Formatable, Separator, trim_space0};
 
-pub fn format_code_block(code_block: &CodeBlock) -> String {
-    let mut result = "{\n".to_string();
-    let body = indent(&format_statements(code_block).as_str(), 1);
-    result.push_str(&body);
-    result.push_str("}");
-    result
+impl Formatable for &CodeBlock {
+    fn format(&self) -> String {
+        format!(
+            "{}{}",
+            format_separated(
+                Delimiter::Braces,
+                Separator::Newline,
+                &self.statements,
+                &self.space_brace_stat1,
+            ),
+            trim_space0(&self.right_space),
+        )
+    }
 }

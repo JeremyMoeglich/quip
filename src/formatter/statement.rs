@@ -1,65 +1,40 @@
-use crate::fst::{Argument, CodeBlock, Expression, Space, Statement};
+use crate::fst::{
+    Expression, ExternStatement, FunctionStatement, Parameter, Parameters, Space, Statement,
+    EMPTY_SPACE,
+};
 
-use super::utils::{format_newline_whitespace, trim_space0, trim_space1};
+use super::{
+    expression::format_expression,
+    utils::{
+        format_separated, limit_whitespace, trim_space0, trim_space1, Delimiter, Formatable,
+        Separated, Separator,
+    },
+};
 
-pub fn format_statement(statement: &Statement) -> String {
-    let mut result = String::new();
-    let text = match statement {
-        Statement::Extern {
-            space_extern_ident,
-            name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            args,
-            right_space,
-        } => format_extern(
-            space_extern_ident,
-            name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            args,
-            right_space,
-        ),
-        Statement::ImplicitReturn { value } => format_implicit_return(value),
-        Statement::Function {
-            space_fn_ident,
-            name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            args,
-            space_rparen_lbrace,
-            space_lbrace_expr,
-            body,
-            right_space,
-        } => format_function(
-            space_fn_identlet,
-            name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            args,
-            space_rparen_lbrace,
-            space_lbrace_expr,
-            body,
-            right_space,
-        ),
-    };
+impl Formatable for &Statement {
+    fn format(&self) -> String {
+        match self {
+            Statement::Extern(extern_statement) => format_extern(extern_statement),
+            Statement::ImplicitReturn(expr) => format_implicit_return(expr),
+            Statement::Function(function) => format_function(function),
+        }
+    }
 }
 
-fn format_extern(
-    space_extern_ident: &Space,
-    name: &str,
-    space_ident_lparen: &Space,
-    space_lparen_arg1: &Space,
-    args: &[Argument],
-    right_space: &Space,
-) -> String {
+impl Formatable for Statement {
+    fn format(&self) -> String {
+        (&self).format()
+    }
+}
+
+fn format_extern(extern_: &ExternStatement) -> String {
     format!(
         "extern{}{}{}{}{}",
-        &trim_space1(space_extern_ident),
-        name,
-        &trim_space0(space_ident_lparen),
-        format_arguments(space_lparen_arg1, args),
-        &format_newline_whitespace(right_space),
+        trim_space1(&extern_.space_extern_ident),
+        extern_.name,
+        trim_space0(&extern_.space_ident_lparen),
+        format_parameters(&extern_.space_lparen_arg1, &extern_.params),
+        limit_whitespace(&extern_.right_space, true),
     )
 }
 
@@ -67,48 +42,44 @@ fn format_implicit_return(expr: &Expression) -> String {
     format_expression(expr)
 }
 
-fn format_function(
-    space_fn_ident: &Space,
-    name: &str,
-    space_ident_lparen: &Space,
-    space_lparen_arg1: &Space,
-    args: &[Argument],
-    space_rparen_lbrace: &Space,
-    space_lbrace_expr: &Space,
-    body: CodeBlock,
-    right_space: &Space,
-) {
-    
+fn format_parameters(begin_space: &Space, params: &Parameters) -> String {
+    format_separated(Delimiter::Parens, Separator::Comma, params, begin_space)
 }
 
-fn format_arguments(begin_space: &Space, args: &[Argument]) -> String {
-    let render_single_line = move || {
-        let mut result = String::new();
-        for (i, arg) in args.iter().enumerate() {
-            if i > 0 {
-                result.push_str(", ");
-            }
-            result.push_str(&format_argument(arg));
-        }
-        result
-    };
-    let render_multi_line = move || {
-        let mut result = String::new();
-        for (i, arg) in args.iter().enumerate() {
-            if i > 0 {
-                result.push_str(",\n");
-            }
-            result.push_str(&format_argument(arg));
-        }
-        result
-    };
-    if begin_space.has_comments() {
-        return render_multi_line();
-    };
-    let text = render_single_line();
-    if text.len() > 20 {
-        render_multi_line()
-    } else {
-        text
+impl Separated<String> for Parameter {
+    fn text(&self) -> String {
+        self.name.clone()
+    }
+    fn space(&self) -> &Space {
+        &self.space_ident_right
+    }
+    fn after_comma(&self) -> &Option<Space> {
+        &self.space_after_comma
+    }
+}
+
+fn format_function(func: &FunctionStatement) -> String {
+    format!(
+        "fn{}{}{}{}{}{}{}{}",
+        trim_space1(&func.space_fn_ident),
+        func.name,
+        trim_space0(&func.space_ident_lparen),
+        format_parameters(&func.space_lparen_arg1, &func.params),
+        trim_space0(&func.space_rparen_lbrace),
+        trim_space1(&func.space_lbrace_expr),
+        (&func.body).format(),
+        limit_whitespace(&func.right_space, true),
+    )
+}
+
+impl Separated<Statement> for Statement {
+    fn text(&self) -> Self {
+        self.clone()
+    }
+    fn space(&self) -> &Space {
+        &EMPTY_SPACE
+    }
+    fn after_comma(&self) -> &Option<Space> {
+        &None
     }
 }

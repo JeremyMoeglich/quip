@@ -1,27 +1,31 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    Extern {
-        space_extern_ident: Space,
-        name: Ident,
-        space_ident_lparen: Space,
-        space_lparen_arg1: Space,
-        args: Arguments,
-        right_space: Space,
-    },
-    ImplicitReturn {
-        value: Expression,
-    },
-    Function {
-        space_fn_ident: Space,
-        name: Ident,
-        space_ident_lparen: Space,
-        space_lparen_arg1: Space,
-        args: Arguments,
-        space_rparen_lbrace: Space,
-        space_lbrace_expr: Space,
-        body: CodeBlock,
-        right_space: Space,
-    },
+    Extern(ExternStatement),
+    ImplicitReturn(Expression),
+    Function(FunctionStatement),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExternStatement {
+    pub space_extern_ident: Space,
+    pub name: Ident,
+    pub space_ident_lparen: Space,
+    pub space_lparen_arg1: Space,
+    pub params: Parameters,
+    pub right_space: Space,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionStatement {
+    pub space_fn_ident: Space,
+    pub name: Ident,
+    pub space_ident_lparen: Space,
+    pub space_lparen_arg1: Space,
+    pub params: Parameters,
+    pub space_rparen_lbrace: Space,
+    pub space_lbrace_expr: Space,
+    pub body: CodeBlock,
+    pub right_space: Space,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,7 +37,7 @@ pub enum SpacePart {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Space {
-    pub space: Vec<SpacePart>
+    pub space: Vec<SpacePart>,
 }
 
 impl Space {
@@ -47,12 +51,16 @@ impl Space {
             _ => false,
         })
     }
+    pub fn empty() -> Self {
+        Space { space: vec![] }
+    }
 }
 
-impl Iterator for Space {
-    type Item = SpacePart;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.space.pop()
+impl<'a> IntoIterator for &'a Space {
+    type Item = &'a SpacePart;
+    type IntoIter = std::slice::Iter<'a, SpacePart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.space.iter()
     }
 }
 
@@ -60,31 +68,36 @@ pub type Ident = String;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    Call {
-        name: Ident,
-        space_ident_lparen: Space,
-        space_lparen_arg1: Space,
-        params: Parameters,
-        right_space: Space,
-    },
-    Segment {
-        segment: Segment,
-    },
+    Call(CallExpression),
+    Segment(Segment),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallExpression {
+    pub name: Ident,
+    pub space_ident_lparen: Space,
+    pub space_lparen_arg1: Space,
+    pub args: Arguments,
+    pub right_space: Space,
 }
 
 pub type Arguments = Vec<Argument>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
-    pub name: Ident,
+    pub expr: Expression,
     pub space_ident_right: Space,
     pub space_after_comma: Option<Space>,
 }
 
 impl Argument {
-    pub fn new(name: String, space_ident_right: Space, space_after_comma: Option<Space>) -> Self {
+    pub fn new(
+        expr: Expression,
+        space_ident_right: Space,
+        space_after_comma: Option<Space>,
+    ) -> Self {
         Argument {
-            name,
+            expr,
             space_ident_right,
             space_after_comma,
         }
@@ -95,19 +108,15 @@ pub type Parameters = Vec<Parameter>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    pub expression: Expression,
+    pub name: Ident,
     pub space_ident_right: Space,
     pub space_after_comma: Option<Space>,
 }
 
 impl Parameter {
-    pub fn new(
-        expression: Expression,
-        space_ident_right: Space,
-        space_after_comma: Option<Space>,
-    ) -> Self {
+    pub fn new(name: Ident, space_ident_right: Space, space_after_comma: Option<Space>) -> Self {
         Parameter {
-            expression,
+            name,
             space_ident_right,
             space_after_comma,
         }
@@ -116,11 +125,38 @@ impl Parameter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Segment {
-    Number { number: f64, right_space: Space },
-    Ident { ident: String, right_space: Space },
+    Number(NumberSegment),
+    Ident(IdentSegment),
 }
 
-pub type CodeBlock = Vec<Statement>;
+#[derive(Debug, Clone, PartialEq)]
+pub struct NumberSegment {
+    pub number: String,
+    pub right_space: Space,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IdentSegment {
+    pub ident: String,
+    pub right_space: Space,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CodeBlock {
+    pub space_brace_stat1: Space,
+    pub statements: Vec<Statement>,
+    pub right_space: Space,
+}
+
+impl CodeBlock {
+    pub fn new(space_brace_stat1: Space, statements: Vec<Statement>, right_space: Space) -> Self {
+        CodeBlock {
+            space_brace_stat1,
+            statements,
+            right_space,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fst {

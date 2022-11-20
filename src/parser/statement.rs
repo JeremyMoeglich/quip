@@ -1,13 +1,12 @@
 use nom::branch::alt;
 
-use crate::fst::Statement;
+use crate::fst::{ExternStatement, FunctionStatement, Statement};
 
 use super::{
-    arguments::parse_arguments,
     code_block::parse_code_block,
     expression::parse_expression,
     lexer::TokenKind,
-    utils::{opt_token, parse_ident, token, ws0, ws1, ParseResult, TokenSlice},
+    utils::{opt_token, parse_ident, token, ws0, ws1, ParseResult, TokenSlice}, parameters::parse_parameters,
 };
 
 pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> {
@@ -17,7 +16,7 @@ pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> 
         if let Some(_) = semi {
             todo!()
         } else {
-            Ok((input, Statement::ImplicitReturn { value: start_expr }))
+            Ok((input, Statement::ImplicitReturn(start_expr)))
         }
     }))(input)
 }
@@ -29,19 +28,19 @@ fn parse_extern(input: TokenSlice) -> ParseResult<Statement> {
     let (input, space_ident_lparen) = ws0(input)?;
     let (input, _) = token(TokenKind::LParen)(input)?;
     let (input, space_lparen_arg1) = ws0(input)?;
-    let (input, args) = parse_arguments(input)?;
+    let (input, params) = parse_parameters(input)?;
     let (input, _) = token(TokenKind::RParen)(input)?;
     let (input, right_space) = ws0(input)?;
     Ok((
         input,
-        Statement::Extern {
+        Statement::Extern(ExternStatement {
             space_extern_ident,
             name: name,
             space_ident_lparen,
             space_lparen_arg1,
-            args: args,
+            params,
             right_space,
-        },
+        }),
     ))
 }
 
@@ -52,7 +51,7 @@ fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
     let (input, space_ident_lparen) = ws0(input)?;
     let (input, _) = token(TokenKind::LParen)(input)?;
     let (input, space_lparen_arg1) = ws0(input)?;
-    let (input, args) = parse_arguments(input)?;
+    let (input, params) = parse_parameters(input)?;
     let (input, _) = token(TokenKind::RParen)(input)?;
     let (input, space_rparen_lbrace) = ws0(input)?;
     let (input, _) = token(TokenKind::LBrace)(input)?;
@@ -62,16 +61,16 @@ fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
     let (input, right_space) = ws0(input)?;
     Ok((
         input,
-        Statement::Function {
+        Statement::Function(FunctionStatement {
             space_fn_ident,
             name: name,
             space_ident_lparen,
             space_lparen_arg1,
-            args: args,
+            params,
             space_rparen_lbrace,
             space_lbrace_expr,
             body: body,
             right_space,
-        },
+        }),
     ))
 }

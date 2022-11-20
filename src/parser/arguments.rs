@@ -1,16 +1,15 @@
-
-use crate::fst::{Arguments, Argument};
+use crate::fst::{Argument, Arguments};
 
 use super::{
-    lexer::TokenKind,
-    utils::{comma_separated, token, ParseResult, TokenSlice},
+    expression::parse_expression,
+    utils::{comma_separated, ParseResult, TokenSlice},
 };
 
 pub fn parse_arguments(input: TokenSlice) -> ParseResult<Arguments> {
-    let (input, values) = comma_separated(token(TokenKind::Ident))(input)?;
+    let (input, values) = comma_separated(parse_expression)(input)?;
     let args = values
         .into_iter()
-        .map(|(token, space, second_space)| Argument::new(token.string(), space, second_space))
+        .map(|(expr, space, second_space)| Argument::new(expr, space, second_space))
         .collect();
     Ok((input, args))
 }

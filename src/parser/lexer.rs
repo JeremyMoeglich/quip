@@ -26,8 +26,8 @@ pub enum Token<'a> {
 
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Ident(&'a str),
-    #[regex("[0-9]+", |lex| lex.slice().parse())]
-    Number(f64),
+    #[regex("[0-9]+")]
+    Number(&'a str),
 
     #[token(";")]
     Semi,
@@ -53,14 +53,8 @@ impl Token<'_> {
             Token::Whitespace(whitespace) => whitespace.to_string(),
             Token::SingleLineComment(comment) => comment.to_string(),
             Token::MultiLineComment(comment) => comment.to_string(),
+            Token::Number(number) => number.to_string(),
             _ => panic!("Expected string, got {:?}", self),
-        }
-    }
-
-    pub fn number(&self) -> f64 {
-        match self {
-            Token::Number(number) => *number,
-            _ => panic!("Expected number, got {:?}", self),
         }
     }
 }
@@ -82,10 +76,6 @@ impl<'a> LocatedToken<'a> {
 
     pub fn string(&self) -> String {
         self.token.string()
-    }
-
-    pub fn number(&self) -> f64 {
-        self.token.number()
     }
 }
 
