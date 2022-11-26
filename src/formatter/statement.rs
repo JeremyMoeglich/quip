@@ -1,6 +1,5 @@
 use crate::fst::{
     Expression, ExternStatement, FunctionStatement, Parameter, Parameters, Space, Statement,
-    EMPTY_SPACE,
 };
 
 use super::{
@@ -50,8 +49,8 @@ impl Separated<String> for Parameter {
     fn text(&self) -> String {
         self.name.clone()
     }
-    fn space(&self) -> &Space {
-        &self.space_ident_right
+    fn space(&self) -> Option<&Space> {
+        Some(&self.space_ident_right)
     }
     fn after_comma(&self) -> &Option<Space> {
         &self.space_after_comma
@@ -60,13 +59,12 @@ impl Separated<String> for Parameter {
 
 fn format_function(func: &FunctionStatement) -> String {
     format!(
-        "fn{}{}{}{}{}{}{}{}",
+        "fn{}{}{}{}{}{}{}",
         trim_space1(&func.space_fn_ident),
         func.name,
         trim_space0(&func.space_ident_lparen),
         format_parameters(&func.space_lparen_arg1, &func.params),
-        trim_space0(&func.space_rparen_lbrace),
-        trim_space1(&func.space_lbrace_expr),
+        trim_space1(&func.space_rparen_lbrace),
         (&func.body).format(),
         limit_whitespace(&func.right_space, true),
     )
@@ -76,8 +74,8 @@ impl Separated<Statement> for Statement {
     fn text(&self) -> Self {
         self.clone()
     }
-    fn space(&self) -> &Space {
-        &EMPTY_SPACE
+    fn space(&self) -> Option<&Space> {
+        None
     }
     fn after_comma(&self) -> &Option<Space> {
         &None

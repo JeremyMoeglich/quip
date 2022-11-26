@@ -23,7 +23,6 @@ pub struct FunctionStatement {
     pub space_lparen_arg1: Space,
     pub params: Parameters,
     pub space_rparen_lbrace: Space,
-    pub space_lbrace_expr: Space,
     pub body: CodeBlock,
     pub right_space: Space,
 }

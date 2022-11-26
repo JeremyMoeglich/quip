@@ -50,23 +50,36 @@ pub fn format_multi_line_comment(input: &str) -> String {
     text
 }
 
-pub fn limit_whitespace(input: &Space, require_newline: bool) -> String {
-    let base_string = match require_newline {
-        true => "\n",
-        false => "",
+fn escape_all(input: &str) -> String {
+    // escape characters such as newlines as \n
+    let mut result = String::new();
+    for c in input.chars() {
+        match c {
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            _ => result.push(c),
+        }
     }
-    .to_string();
-    input
+    result
+}
+
+fn has_newline(input: &str) -> bool {
+    input.contains('\r') || input.contains('\n')
+}
+
+pub fn limit_whitespace(input: &Space, require_newline: bool) -> String {
+    let text = input
         .space
         .iter()
         .fold(String::new(), |mut acc, space_part| {
             let new_space_part = match space_part {
                 SpacePart::Whitespace(s) => match s.len() {
-                    0 => base_string.clone(),
+                    0 => "".to_string(),
                     _ => {
                         let line_count = s.lines().count();
                         match line_count {
-                            0 => base_string.clone(),
+                            0 => unreachable!("Whitespace should have at least one line"),
                             _ => "\n".repeat(line_count.min(3)),
                         }
                     }
@@ -76,7 +89,12 @@ pub fn limit_whitespace(input: &Space, require_newline: bool) -> String {
             };
             acc.push_str(&new_space_part);
             acc
-        })
+        });
+    if require_newline && !has_newline(&text) {
+        format!("\n{}", text)
+    } else {
+        text
+    }
 }
 
 pub fn indent(input: &str, indent: usize) -> String {
@@ -116,14 +134,14 @@ impl Delimiter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Separator {
     Comma,
-    Newline
+    Newline,
 }
 
 impl Display for Separator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Separator::Comma => write!(f, ","),
-            Separator::Newline => write!(f, "")
+            Separator::Newline => write!(f, ""),
         }
     }
 }
@@ -138,6 +156,7 @@ pub fn format_separated<S: Separated<T>, T: Formatable>(
         .iter()
         .map(|s| (s.text().format(), s.space(), s.after_comma()))
         .collect::<Vec<_>>();
+    let seperator_ref = &separator;
     let render_texts = move |trailing: bool| {
         formated
             .iter()
@@ -147,13 +166,16 @@ pub fn format_separated<S: Separated<T>, T: Formatable>(
                     "{}{}{}{}",
                     s.0,
                     match i == separated.len() - 1 {
-                        false => separator.to_string(),
+                        false => seperator_ref.to_string(),
                         true => match trailing {
-                            true => separator.to_string(),
+                            true => seperator_ref.to_string(),
                             false => "".to_string(),
                         },
                     },
-                    trim_space0(s.1),
+                    match s.1 {
+                        Some(s) => trim_space0(s),
+                        None => "".to_string(),
+                    },
                     match s.2 {
                         None => "".to_string(),
                         Some(space) => trim_space0(space),
@@ -181,12 +203,15 @@ pub fn format_separated<S: Separated<T>, T: Formatable>(
         )
     };
     if begin_space.has_comments()
-        || separated.iter().any(|s| {
-            s.space().has_comments()
-                || match s.after_comma() {
-                    None => false,
-                    Some(space) => space.has_comments(),
-                }
+        || separated.iter().any(|s| match s.space() {
+            Some(space) => {
+                space.has_comments()
+                    || match s.after_comma() {
+                        None => false,
+                        Some(space) => space.has_comments(),
+                    }
+            }
+            None => separator == Separator::Newline,
         })
     {
         return render_multi_line();
@@ -204,7 +229,7 @@ where
     T: Formatable,
 {
     fn text(&self) -> T;
-    fn space(&self) -> &Space;
+    fn space(&self) -> Option<&Space>;
     fn after_comma(&self) -> &Option<Space>;
 }
 

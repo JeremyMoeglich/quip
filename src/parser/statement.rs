@@ -54,10 +54,7 @@ fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
     let (input, params) = parse_parameters(input)?;
     let (input, _) = token(TokenKind::RParen)(input)?;
     let (input, space_rparen_lbrace) = ws0(input)?;
-    let (input, _) = token(TokenKind::LBrace)(input)?;
-    let (input, space_lbrace_expr) = ws0(input)?;
     let (input, body) = parse_code_block(input)?;
-    let (input, _) = token(TokenKind::RBrace)(input)?;
     let (input, right_space) = ws0(input)?;
     Ok((
         input,
@@ -68,7 +65,6 @@ fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
             space_lparen_arg1,
             params,
             space_rparen_lbrace,
-            space_lbrace_expr,
             body: body,
             right_space,
         }),

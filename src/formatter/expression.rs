@@ -17,8 +17,8 @@ impl Separated<String> for Argument {
     fn text(&self) -> String {
         format_expression(&self.expr)
     }
-    fn space(&self) -> &Space {
-        &self.space_ident_right
+    fn space(&self) -> Option<&Space> {
+        Some(&self.space_ident_right)
     }
     fn after_comma(&self) -> &Option<Space> {
         &self.space_after_comma
@@ -35,7 +35,7 @@ fn format_call(call: &CallExpression) -> String {
         call.name,
         trim_space0(&call.space_ident_lparen),
         format_arguments(&call.space_lparen_arg1, &call.args),
-        limit_whitespace(&call.right_space, true)
+        limit_whitespace(&call.right_space, false)
     )
 }
 
