@@ -126,6 +126,7 @@ impl Parameter {
 pub enum Segment {
     Number(NumberSegment),
     Ident(IdentSegment),
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq)]

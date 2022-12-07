@@ -1,6 +1,6 @@
 use crate::fst::CodeBlock;
 
-use super::utils::{format_separated, Delimiter, Formatable, Separator, trim_space0};
+use super::utils::{format_separated, trim_space0, Delimiter, Formatable, Separator};
 
 impl Formatable for &CodeBlock {
     fn format(&self) -> String {

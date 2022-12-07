@@ -1,6 +1,5 @@
 use enum_kinds::EnumKind;
 use logos::{Logos, Span};
-use nom::InputLength;
 
 #[derive(Logos, Debug, PartialEq, EnumKind, Clone)]
 #[enum_kind(TokenKind)]
@@ -76,12 +75,6 @@ impl<'a> LocatedToken<'a> {
 
     pub fn string(&self) -> String {
         self.token.string()
-    }
-}
-
-impl InputLength for LocatedToken<'_> {
-    fn input_len(&self) -> usize {
-        self.span.end - self.span.start
     }
 }
 

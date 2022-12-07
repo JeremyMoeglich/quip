@@ -2,7 +2,7 @@ use crate::fst::{Argument, Arguments};
 
 use super::{
     expression::parse_expression,
-    utils::{comma_separated, ParseResult, TokenSlice},
+    core::{comma_separated, ParseResult, TokenSlice},
 };
 
 pub fn parse_arguments(input: TokenSlice) -> ParseResult<Arguments> {

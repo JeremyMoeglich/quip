@@ -1,9 +1,13 @@
-extern sin(arg)
-extern cos(arg)
+// this is an example of a program in the quip programming language
+// this is used to test formatting
+
+extern sin(arg) // some comment
+/* some comment */ extern cos(arg)
 extern atan2(arg1, arg2)
 
-fn example(v1, v2) {
-    atan2(
+fn example(v1, v2) // some comment 
+{ // some comment
+    atan2( // some comment
         sin(v1),
         cos(v2),
     )

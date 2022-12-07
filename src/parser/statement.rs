@@ -1,12 +1,11 @@
-use nom::branch::alt;
-
 use crate::fst::{ExternStatement, FunctionStatement, Statement};
 
 use super::{
     code_block::parse_code_block,
     expression::parse_expression,
     lexer::TokenKind,
-    utils::{opt_token, parse_ident, token, ws0, ws1, ParseResult, TokenSlice}, parameters::parse_parameters,
+    parameters::parse_parameters,
+    core::{opt_token, parse_ident, token, ws0, ws1, ParseResult, TokenSlice},
 };
 
 pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> {

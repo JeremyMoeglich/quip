@@ -1,11 +1,9 @@
-use nom::{multi::many0, sequence::tuple};
-
 use crate::fst::Fst;
 
 use self::{
     lexer::lex,
     statement::parse_statement,
-    utils::{force_eof, ws0, ParseResult, TokenSlice},
+    core::{force_eof, ws0, ParseResult, TokenSlice},
 };
 
 mod arguments;
@@ -14,7 +12,7 @@ mod expression;
 mod lexer;
 mod parameters;
 mod statement;
-mod utils;
+mod core;
 
 pub fn parse_fst<'a>(tokens: TokenSlice<'a>) -> ParseResult<'a, Fst> {
     let (input, (beginning_space, index_block)) =

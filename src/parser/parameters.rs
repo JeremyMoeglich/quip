@@ -2,7 +2,7 @@ use crate::fst::{Parameter, Parameters};
 
 use super::{
     lexer::TokenKind,
-    utils::{comma_separated, token, ParseResult, TokenSlice},
+    core::{comma_separated, token, ParseResult, TokenSlice},
 };
 
 pub fn parse_parameters(input: TokenSlice) -> ParseResult<Parameters> {

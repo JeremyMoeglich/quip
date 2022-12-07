@@ -1,16 +1,14 @@
-use nom::multi::many0;
-
 use crate::{
     fst::CodeBlock,
     parser::{
         lexer::TokenKind,
-        utils::{ParseResult, TokenSlice},
+        core::{ParseResult, TokenSlice},
     },
 };
 
 use super::{
     statement::parse_statement,
-    utils::{token, ws0},
+    core::{token, ws0},
 };
 
 pub fn parse_code_block<'a>(input: TokenSlice<'a>) -> ParseResult<CodeBlock> {

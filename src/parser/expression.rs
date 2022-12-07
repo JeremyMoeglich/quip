@@ -3,9 +3,8 @@ use crate::fst::{CallExpression, Expression, IdentSegment, NumberSegment, Segmen
 use super::{
     arguments::parse_arguments,
     lexer::TokenKind,
-    utils::{parse_ident, token, ws0, ParseResult, TokenSlice},
+    core::{parse_ident, token, ws0, ParseResult, TokenSlice},
 };
-use nom::{branch::alt, combinator::map, sequence::tuple};
 
 pub fn parse_expression(input: TokenSlice) -> ParseResult<Expression> {
     alt((
