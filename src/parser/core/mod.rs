@@ -2,26 +2,15 @@ use std::fmt::Debug;
 
 use crate::fst::{Ident, Space, SpacePart};
 
-use self::parser::{ParseErrorData, ParseResult, Parser, RecoveryFunc, TokenSlice};
+use self::{
+    flatten::BaseElement,
+    parser::{not_it, ParseErrorData, ParseResult, Parser, ParserInput, RecoveryFunc, TokenSlice},
+};
 
 use super::lexer::{LocatedToken, Token, TokenKind};
 
 mod flatten;
 mod parser;
-
-pub fn not_it<'a, T: Debug + Clone>(
-    error_token: Option<&'a LocatedToken<'a>>,
-    valid_start: bool,
-    recovery: RecoveryFunc<'a, T>,
-    expected: Vec<TokenKind>,
-) -> ParseResult<'a, T> {
-    Err(ParseErrorData::new(
-        error_token,
-        valid_start,
-        recovery,
-        expected,
-    ))
-}
 
 pub fn slice_next(input: TokenSlice) -> ParseResult<LocatedToken> {
     if let Some((head, tail)) = input.split_first() {
@@ -256,38 +245,38 @@ pub fn force_eof<'a, T: Debug + Clone + 'a>(
     }
 }
 
-pub fn comma_separated<'a, T: Debug + Clone>(
+pub fn comma_separated<'a, T: Debug + Clone + BaseElement + 'a>(
     mut parser: impl Parser<'a, T> + 'a,
 ) -> impl Parser<'a, Vec<(T, Space, Option<Space>)>> + 'a {
+    let token_parser = opt_token(TokenKind::Comma);
+    let mut segment_parser = parser
+        .chain(&ws0)
+        .chain(&token_parser)
+        .chain(&|input| {
+            let (input, comma) = opt_token(TokenKind::Comma)(input).unwrap();
+            if let Some(_) = comma {
+                let (input, space) = ws0(input).unwrap();
+                Ok((input, Some(space)))
+            } else {
+                Ok((input, None))
+            }
+        })
+        .flattened()
+        .map_result(&|(value, space1, comma, space2)| (value, space1, None));
     move |input: TokenSlice<'a>| {
         let mut last_arg = false;
-        let (input, args) = many0(|input| {
+        many0(|input: ParserInput| {
             if last_arg {
                 return not_it(
                     input.get(0),
                     true,
-                    Box::new(move || (input, Vec::new())),
+                    Box::new(move || segment_parser.force(input)),
                     vec![TokenKind::Whitespace],
                 );
             };
-            let res = parser
-                .chain(&ws0)
-                .chain(&opt_token(TokenKind::Comma))
-                .chain(&|input| {
-                    let (input, comma) = opt_token(TokenKind::Comma)(input)?;
-                    if let Some(_) = comma {
-                        let (input, space) = ws0(input).unwrap();
-                        Ok((input, Some(space)))
-                    } else {
-                        last_arg = true;
-                        Ok((input, None))
-                    }
-                })
-                .flattened();
-            5
+            segment_parser.parse(input)
         })
-        .parse(input)?;
-        Ok((input, args))
+        .parse(input)
     }
 }
 

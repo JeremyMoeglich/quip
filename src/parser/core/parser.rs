@@ -8,9 +8,7 @@ use crate::parser::lexer::{LocatedToken, TokenKind};
 
 pub type TokenSlice<'a> = &'a [LocatedToken<'a>];
 
-pub type RecoveryResult<'a, T> = (TokenSlice<'a>, T);
-
-pub type RecoveryFunc<'a, T> = Box<dyn FnOnce() -> RecoveryResult<'a, T> + 'a>;
+pub type RecoveryFunc<'a, T> = Box<dyn FnOnce() -> ParseSuccess<'a, T> + 'a>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -39,7 +37,8 @@ impl<'a, T: Debug + Clone> ParseErrorData<'a, T> {
     }
 }
 
-pub type ParseResult<'a, T: Debug + Clone> = Result<(TokenSlice<'a>, T), ParseErrorData<'a, T>>;
+pub type ParseSuccess<'a, T: Debug + Clone> = (TokenSlice<'a>, T);
+pub type ParseResult<'a, T: Debug + Clone> = Result<ParseSuccess<'a, T>, ParseErrorData<'a, T>>;
 /// The type returned by a parser
 pub type ParserInput<'a> = TokenSlice<'a>;
 /// The single argument of a parser
@@ -47,7 +46,33 @@ pub type ParserInput<'a> = TokenSlice<'a>;
 pub trait Parser<'a, T: Debug + Clone> {
     /// use the parser
     fn parse(&mut self, input: ParserInput<'a>) -> ParseResult<'a, T>;
-
+    fn force(&mut self, input: ParserInput<'a>) -> ParseSuccess<'a, T> {
+        let result = self.parse(input);
+        match result {
+            Ok((input, output)) => (input, output),
+            Err(err) => (err.recovery)(),
+        }
+    }
+    fn map_result<U: Debug + Clone>(
+        &mut self,
+        f: &'a (impl FnMut(T) -> U + 'a),
+    ) -> Box<dyn FnMut(ParserInput<'a>) -> ParseResult<'a, U> + 'a> {
+        Box::new(move |input| {
+            let result = self.parse(input);
+            match result {
+                Ok((input, output)) => Ok((input, f(output))),
+                Err(err) => not_it(
+                    err.error_token,
+                    err.valid_start,
+                    Box::new(move || {
+                        let (input, output) = (err.recovery)();
+                        (input, f(output))
+                    }),
+                    err.expected,
+                ),
+            }
+        })
+    }
     /// Take two parsers and put their result in a tuple
     /// if an error occurs, create a recovery function that will try to recover from errors in either parser
     fn chain<U: Debug + Clone>(
@@ -120,4 +145,18 @@ where
     fn parse(&mut self, input: ParserInput<'a>) -> ParseResult<'a, T> {
         self(input)
     }
+}
+
+pub fn not_it<'a, T: Debug + Clone>(
+    error_token: Option<&'a LocatedToken<'a>>,
+    valid_start: bool,
+    recovery: RecoveryFunc<'a, T>,
+    expected: Vec<TokenKind>,
+) -> ParseResult<'a, T> {
+    Err(ParseErrorData::new(
+        error_token,
+        valid_start,
+        recovery,
+        expected,
+    ))
 }
