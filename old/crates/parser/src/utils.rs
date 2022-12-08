@@ -63,9 +63,9 @@ pub fn ws1(input: Span) -> IResult<Span, Whitespace> {
     Ok((input, whitespace))
 }
 
-pub fn vec_alt<'a, O, F>(mut parsers: Vec<F>) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, O>
+pub fn vec_alt<'a, O, F>(mut parsers: Vec<F>) -> impl Fn(Span<'a>) -> IResult<Span<'a>, O>
 where
-    F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
+    F: Fn(Span<'a>) -> IResult<Span<'a>, O>,
 {
     move |input| {
         let mut result = Err(nom::Err::Error(nom::error::Error::new(
@@ -84,9 +84,9 @@ where
 
 pub fn ws_delimited<'a, O, F>(
     mut parser: F,
-) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, (Whitespace, O, Whitespace)>
+) -> impl Fn(Span<'a>) -> IResult<Span<'a>, (Whitespace, O, Whitespace)>
 where
-    F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
+    F: Fn(Span<'a>) -> IResult<Span<'a>, O>,
 {
     move |input| {
         let (input, whitespace_before) = ws(input)?;
@@ -96,9 +96,9 @@ where
     }
 }
 
-pub fn vec_tuple<'a, O, F>(mut parsers: Vec<F>) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Vec<O>>
+pub fn vec_tuple<'a, O, F>(mut parsers: Vec<F>) -> impl Fn(Span<'a>) -> IResult<Span<'a>, Vec<O>>
 where
-    F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
+    F: Fn(Span<'a>) -> IResult<Span<'a>, O>,
 {
     move |input| {
         let mut result = Ok((input, Vec::new()));
@@ -116,9 +116,9 @@ where
     }
 }
 
-pub fn acond<'a, O, F>(boolean: bool, mut parser: F) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, O>
+pub fn acond<'a, O, F>(boolean: bool, mut parser: F) -> impl Fn(Span<'a>) -> IResult<Span<'a>, O>
 where
-    F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
+    F: Fn(Span<'a>) -> IResult<Span<'a>, O>,
 {
     move |input| match boolean {
         true => parser(input),

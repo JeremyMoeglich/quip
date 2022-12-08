@@ -1,15 +1,17 @@
 use crate::fst::{Argument, Arguments};
 
 use super::{
+    common::comma_separated,
+    core::{ParseResult, Parser, TokenSlice},
     expression::parse_expression,
-    core::{comma_separated, ParseResult, TokenSlice},
 };
 
 pub fn parse_arguments(input: TokenSlice) -> ParseResult<Arguments> {
-    let (input, values) = comma_separated(parse_expression)(input)?;
-    let args = values
-        .into_iter()
-        .map(|(expr, space, second_space)| Argument::new(expr, space, second_space))
-        .collect();
-    Ok((input, args))
+    comma_separated(parse_expression)
+        .map_result(|args| {
+            args.iter()
+                .map(|arg| Argument::new(arg.0, arg.1, arg.2))
+                .collect()
+        })
+        .parse(input)
 }

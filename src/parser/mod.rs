@@ -1,9 +1,10 @@
 use crate::fst::Fst;
+mod common;
 
 use self::{
     lexer::lex,
     statement::parse_statement,
-    core::{force_eof, ws0, ParseResult, TokenSlice},
+    core::{ParseResult, TokenSlice}, common::{ws0, many0, force_eof},
 };
 
 mod arguments;
@@ -16,7 +17,7 @@ mod core;
 
 pub fn parse_fst<'a>(tokens: TokenSlice<'a>) -> ParseResult<'a, Fst> {
     let (input, (beginning_space, index_block)) =
-        force_eof(tuple((ws0, many0(parse_statement))))(tokens)?;
+        force_eof(ws0.chain(many0(parse_statement)).flatten())(tokens)?;
     Ok((input, Fst::new(beginning_space, index_block)))
 }
 

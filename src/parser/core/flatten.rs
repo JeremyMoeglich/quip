@@ -9,7 +9,7 @@
 
 // as rust doesn't support variadic generics yet, we have to use a macro to generate the impl for every tuple size
 
-use crate::{fst::Space, parser::lexer::LocatedToken};
+use crate::{fst::{Space, Expression, Statement, Fst}, parser::lexer::LocatedToken};
 
 pub fn flatten<T: Flatable>(tuple: T) -> T::Flattened {
     tuple.flatten()
@@ -129,13 +129,13 @@ macro_rules! impl_base_element {
     };
 }
 
-impl_base_element!(
-    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64, bool, char, String,
-    str, Space
-);
 impl<'a> BaseElement for LocatedToken<'a> {}
 impl<T: BaseElement> BaseElement for Option<T> {}
 impl<T: BaseElement> BaseElement for Vec<T> {}
+impl_base_element!(
+    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64, bool, char, String,
+    str, Space, Expression, Statement, Fst
+);
 
 #[cfg(test)]
 mod tests {

@@ -7,9 +7,9 @@ use crate::{
 
 pub fn parse_type_array<'a, F>(
     mut start_parser: F,
-) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, TypeExpression>
+) -> impl Fn(Span<'a>) -> IResult<Span<'a>, TypeExpression>
 where
-    F: FnMut(Span<'a>) -> IResult<Span<'a>, TypeExpression>,
+    F: Fn(Span<'a>) -> IResult<Span<'a>, TypeExpression>,
 {
     move |input| {
         let (mut input, mut expression) = start_parser(input)?;
