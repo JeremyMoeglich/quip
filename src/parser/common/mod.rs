@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug};
 
 use crate::fst::{Ident, Space, SpacePart};
 
@@ -18,7 +18,7 @@ pub fn slice_next(input: TokenSlice) -> ParseResult<LocatedToken> {
             None,
             false,
             Box::new(|| (input, LocatedToken::new(Token::Error, Default::default()))),
-            vec![],
+            HashSet::new(),
         ))
     }
 }
@@ -33,7 +33,11 @@ pub fn token<'a>(kind: TokenKind) -> impl Parser<'a, LocatedToken<'a>> {
                 Some(&input[0]),
                 false,
                 Box::new(move || (input, token.clone())),
-                vec![kind],
+                {
+                    let mut set = HashSet::new();
+                    set.insert(kind);
+                    set
+                },
             ))
         }
     }
@@ -51,7 +55,11 @@ pub fn tokens<'a>(
                 Some(&input[0]),
                 false,
                 Box::new(move || (input, token.clone())),
-                kinds.to_vec(),
+                {
+                    let mut set = HashSet::new();
+                    set.extend(kinds);
+                    set
+                },
             ))
         }
     }
@@ -200,7 +208,7 @@ fn many<'a, T: Debug + Clone + 'a, U>(
                             e.error_token,
                             amount > 0 || e.valid_start,
                             Box::new(move || (input, res)),
-                            vec![TokenKind::Whitespace],
+                            HashSet::new(),
                         ));
                     }
                 }
@@ -220,26 +228,11 @@ pub fn many1<'a, T: Debug + Clone + 'a>(f: impl Parser<'a, T> + 'a) -> ManyParse
 }
 
 pub fn ws0<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Space> {
-    map(many0(parse_space_part), &Space::new).parse(input)
+    many0(parse_space_part).map_result(&Space::new).parse(input)
 }
 
 pub fn ws1<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Space> {
-    map(many1(parse_space_part), &Space::new).parse(input)
-}
-
-pub fn map<'a, T: Debug + Clone, U: Debug + Clone>(
-    f: impl Parser<'a, T> + 'a,
-    g: &'a impl Fn(T) -> U,
-) -> impl Parser<'a, U> + 'a {
-    move |input: TokenSlice<'a>| match f.parse(input) {
-        Ok((input, value)) => Ok((input, g(value))),
-        Err(e) => Err(not_it(
-            e.error_token,
-            e.valid_start,
-            map_recovery(e.recovery, g),
-            e.expected,
-        )),
-    }
+    many1(parse_space_part).map_result(&Space::new).parse(input)
 }
 
 pub fn opt<'a, T: Debug + Clone + 'a>(
@@ -263,7 +256,7 @@ pub fn force_eof<'a, T: Debug + Clone + 'a>(
                 Some(&input[0]),
                 true,
                 Box::new(move || (input, result)),
-                vec![],
+                HashSet::new(),
             ))
         }
     }
@@ -304,7 +297,7 @@ pub fn alt<'a, T: Debug + Clone>(
                         None => Some(e),
                         Some(current_err) => {
                             if e.error_token.is_some() && current_err.error_token.is_none() {
-                                let exprected = current_err
+                                let expected = current_err
                                     .expected
                                     .iter()
                                     .chain(e.expected.iter())
@@ -318,7 +311,7 @@ pub fn alt<'a, T: Debug + Clone>(
                                     best.error_token,
                                     best.valid_start,
                                     best.recovery,
-                                    exprected,
+                                    expected,
                                 ))
                             } else {
                                 Some(current_err)

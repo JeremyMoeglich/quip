@@ -1,6 +1,6 @@
 pub mod flatten;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, collections::HashSet};
 
 use derivative::Derivative;
 
@@ -20,7 +20,7 @@ pub struct ParseErrorData<'a, T: Debug + Clone> {
     pub valid_start: bool, // Whether the parser was able to parse tokens before the error
     #[derivative(Debug = "ignore")]
     pub recovery: RecoveryFunc<'a, T>, // generate a recovery solution,
-    pub expected: Vec<TokenKind>,
+    pub expected: HashSet<TokenKind>,
 }
 
 impl<'a, T: Debug + Clone> ParseErrorData<'a, T> {
@@ -28,7 +28,7 @@ impl<'a, T: Debug + Clone> ParseErrorData<'a, T> {
         error_token: Option<&'a LocatedToken<'a>>,
         valid_start: bool,
         recovery: RecoveryFunc<'a, T>,
-        expected: Vec<TokenKind>,
+        expected: HashSet<TokenKind>,
     ) -> Self {
         ParseErrorData {
             error_token,
@@ -40,10 +40,12 @@ impl<'a, T: Debug + Clone> ParseErrorData<'a, T> {
 }
 
 pub type ParseSuccess<'a, T: Debug + Clone> = (TokenSlice<'a>, T);
-pub type ParseResult<'a, T: Debug + Clone> = Result<ParseSuccess<'a, T>, ParseErrorData<'a, T>>;
+
 /// The type returned by a parser
-pub type ParserInput<'a> = TokenSlice<'a>;
+pub type ParseResult<'a, T: Debug + Clone> = Result<ParseSuccess<'a, T>, ParseErrorData<'a, T>>;
+
 /// The single argument of a parser
+pub type ParserInput<'a> = TokenSlice<'a>;
 
 pub trait Parser<'a, T: Debug + Clone> {
     /// use the parser
@@ -115,6 +117,33 @@ pub trait Parser<'a, T: Debug + Clone> {
         })
     }
 
+    fn alt(
+        &self,
+        f: impl Parser<'a, T> + 'a,
+    ) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, T> + 'a> {
+        Box::new(move |input| {
+            let result1 = self.parse(input);
+            match result1 {
+                Ok((input, output1)) => Ok((input, output1)),
+                Err(err1) => match f.parse(input) {
+                    Ok((input, output2)) => Ok((input, output2)),
+                    Err(err2) => Err(ParseErrorData::new(
+                        match err1.valid_start {
+                            true => err1.error_token,
+                            false => err2.error_token,
+                        },
+                        err1.valid_start || err2.valid_start,
+                        match err1.valid_start {
+                            true => Box::new(move || (err1.recovery)()),
+                            false => Box::new(move || (err2.recovery)()),
+                        },
+                        err1.expected.union(&err2.expected).cloned().collect(),
+                    )),
+                },
+            }
+        })
+    }
+
     /// flatten nested tuples to a single tuple ((p1, p2), p3) -> ((r1, r2), r3) -> (r1, r2, r3)
     fn flattened<O: Clone + Debug>(&self) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, O> + 'a>
     where
@@ -151,7 +180,7 @@ pub fn not_it<'a, T: Debug + Clone>(
     error_token: Option<&'a LocatedToken<'a>>,
     valid_start: bool,
     recovery: RecoveryFunc<'a, T>,
-    expected: Vec<TokenKind>,
+    expected: HashSet<TokenKind>,
 ) -> ParseErrorData<'a, T> {
     ParseErrorData::new(error_token, valid_start, recovery, expected)
 }

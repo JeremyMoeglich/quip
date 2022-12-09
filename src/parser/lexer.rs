@@ -2,7 +2,7 @@ use enum_kinds::EnumKind;
 use logos::{Logos, Span};
 
 #[derive(Logos, Debug, PartialEq, EnumKind, Clone)]
-#[enum_kind(TokenKind)]
+#[enum_kind(TokenKind, derive(Hash))]
 pub enum Token<'a> {
     #[token("fn")]
     Fn,

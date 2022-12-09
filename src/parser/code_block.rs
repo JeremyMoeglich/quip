@@ -13,11 +13,12 @@ use super::{
 };
 
 pub fn parse_code_block<'a>(input: TokenSlice<'a>) -> ParseResult<CodeBlock> {
-    let parser = token(TokenKind::LBrace)
+    token(TokenKind::LBrace)
         .chain(ws0)
         .chain(many0(parse_statement))
         .chain(token(TokenKind::RBrace))
-        .chain(ws0);
-
-    parser.flattened().parse(input)
+        .chain(ws0)
+        .flattened()
+        .map_result(|(_, space1, statements, _, space2)| CodeBlock::new(space1, statements, space2))
+        .parse(input)
 }

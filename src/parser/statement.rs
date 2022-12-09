@@ -5,7 +5,7 @@ use super::{
     expression::parse_expression,
     lexer::TokenKind,
     parameters::parse_parameters,
-    core::{opt_token, parse_ident, token, ws0, ws1, ParseResult, TokenSlice},
+    core::{ParseResult, TokenSlice},
 };
 
 pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> {
