@@ -2,70 +2,96 @@ use crate::fst::{ExternStatement, FunctionStatement, Statement};
 
 use super::{
     code_block::parse_code_block,
+    common::{opt_token, parse_ident, token, ws0, ws1},
+    core::{ParseResult, Parser, TokenSlice},
     expression::parse_expression,
     lexer::TokenKind,
     parameters::parse_parameters,
-    core::{ParseResult, TokenSlice},
 };
 
 pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> {
-    alt((parse_extern, parse_function, |input| {
-        let (input, start_expr) = parse_expression(input)?;
-        let (input, semi) = opt_token(TokenKind::Semi)(input)?;
-        if let Some(_) = semi {
-            todo!()
-        } else {
-            Ok((input, Statement::ImplicitReturn(start_expr)))
-        }
-    }))(input)
+    parse_extern.alt(parse_function).alt(
+        parse_expression
+            .chain(opt_token(TokenKind::Semi))
+            .map_result(|(expr, semi)| match semi {
+                Some(_semi) => todo!(),
+                None => Statement::ImplicitReturn(expr),
+            }),
+    )(input)
 }
 
 fn parse_extern(input: TokenSlice) -> ParseResult<Statement> {
-    let (input, _) = token(TokenKind::Extern)(input)?;
-    let (input, space_extern_ident) = ws1(input)?;
-    let (input, name) = parse_ident(input)?;
-    let (input, space_ident_lparen) = ws0(input)?;
-    let (input, _) = token(TokenKind::LParen)(input)?;
-    let (input, space_lparen_arg1) = ws0(input)?;
-    let (input, params) = parse_parameters(input)?;
-    let (input, _) = token(TokenKind::RParen)(input)?;
-    let (input, right_space) = ws0(input)?;
-    Ok((
-        input,
-        Statement::Extern(ExternStatement {
-            space_extern_ident,
-            name: name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            params,
-            right_space,
-        }),
-    ))
+    token(TokenKind::Extern)
+        .chain(&ws1)
+        .chain(parse_ident)
+        .chain(&ws0)
+        .chain(token(TokenKind::LParen))
+        .chain(&ws0)
+        .chain(parse_parameters)
+        .chain(token(TokenKind::RParen))
+        .chain(&ws0)
+        .flattened()
+        .map_result(
+            |(
+                _,
+                space_extern_ident,
+                name,
+                space_ident_lparen,
+                _,
+                space_lparen_arg1,
+                params,
+                _,
+                right_space,
+            )| {
+                Statement::Extern(ExternStatement {
+                    space_extern_ident,
+                    name,
+                    space_ident_lparen,
+                    space_lparen_arg1,
+                    params,
+                    right_space,
+                })
+            },
+        )(input)
 }
 
 fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
-    let (input, _) = token(TokenKind::Fn)(input)?;
-    let (input, space_fn_ident) = ws1(input)?;
-    let (input, name) = parse_ident(input)?;
-    let (input, space_ident_lparen) = ws0(input)?;
-    let (input, _) = token(TokenKind::LParen)(input)?;
-    let (input, space_lparen_arg1) = ws0(input)?;
-    let (input, params) = parse_parameters(input)?;
-    let (input, _) = token(TokenKind::RParen)(input)?;
-    let (input, space_rparen_lbrace) = ws0(input)?;
-    let (input, body) = parse_code_block(input)?;
-    let (input, right_space) = ws0(input)?;
-    Ok((
-        input,
-        Statement::Function(FunctionStatement {
-            space_fn_ident,
-            name: name,
-            space_ident_lparen,
-            space_lparen_arg1,
-            params,
-            space_rparen_lbrace,
-            body: body,
-            right_space,
-        }),
-    ))
+    token(TokenKind::Fn)
+        .chain(&ws1)
+        .chain(&parse_ident)
+        .chain(&ws0)
+        .chain(token(TokenKind::LParen))
+        .chain(&ws0)
+        .chain(&parse_parameters)
+        .chain(token(TokenKind::RParen))
+        .chain(&ws0)
+        .chain(&parse_code_block)
+        .chain(&ws0)
+        .flattened()
+        .map_result(
+            |(
+                _,
+                space_fn_ident,
+                name,
+                space_ident_lparen,
+                _,
+                space_lparen_arg1,
+                params,
+                _,
+                space_rparen_lbrace,
+                body,
+                right_space,
+            )| {
+                Statement::Function(FunctionStatement {
+                    space_fn_ident,
+                    name: name,
+                    space_ident_lparen,
+                    space_lparen_arg1,
+                    params,
+                    space_rparen_lbrace,
+                    body,
+                    right_space,
+                })
+            },
+        )(input)
 }

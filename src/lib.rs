@@ -2,6 +2,7 @@
 #![feature(macro_metavar_expr)]
 #![feature(auto_traits)]
 #![feature(negative_impls)]
+#![feature(unboxed_closures)]
 
 pub mod formatter;
 pub mod fst;

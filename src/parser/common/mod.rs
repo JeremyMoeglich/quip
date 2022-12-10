@@ -163,17 +163,17 @@ struct ManyParser<'a, T: Debug + Clone, U = ()> {
     check: ManyParserOption<T, U>,
 }
 
-impl<'a, T: Clone + Debug, U> Parser<'a, T> for ManyParser<'a, T, U> {
+impl<'a, T: Clone + Debug + 'a, U> Parser<'a, T> for ManyParser<'a, T, U> {
     fn parse(&self, input: ParserInput<'a>) -> ParseResult<'a, T> {
         self.parser.parse(input)
     }
 }
 
-impl<'a, T: Clone + Debug, U> ManyParser<'a, T, U> {
+impl<'a, T: Clone + Debug + 'a, U> ManyParser<'a, T, U> {
     fn new(parser: impl Parser<'a, T> + 'a, check: ManyParserOption<T, U>) -> Self {
         Self {
             parser: Box::new(move |input| parser.parse(input)),
-            check: check.map(|f| Box::new(move |u, t| f(u, t)) as _),
+            check,
         }
     }
     fn check(self, check: impl Fn(U, T) -> (U, bool) + 'a) -> Self {
@@ -264,64 +264,24 @@ pub fn force_eof<'a, T: Debug + Clone + 'a>(
 
 pub fn comma_separated<'a, T: Debug + Clone + BaseElement + 'a>(
     parser: impl Parser<'a, T> + 'a,
-) -> impl Parser<'a, Vec<(T, Space, Option<Space>)>> + 'a {
-    let token_parser = opt_token(TokenKind::Comma);
-    let segment_parser = parser
-        .chain(&ws0)
-        .chain(token_parser)
-        .chain(&|input| {
-            let (input, comma) = opt_token(TokenKind::Comma)(input).unwrap();
-            if let Some(_) = comma {
-                let (input, space) = ws0(input).unwrap();
-                Ok((input, Some(space)))
-            } else {
-                Ok((input, None))
-            }
-        })
-        .flattened()
-        .map_result(&|(value, space1, comma, space2)| (value, space1, None));
-    many0(segment_parser)
-}
-
-pub fn alt<'a, T: Debug + Clone>(
-    parsers: Vec<impl Fn(TokenSlice<'a>) -> ParseResult<'a, T> + 'a>,
-) -> impl Fn(TokenSlice<'a>) -> ParseResult<'a, T> + 'a {
-    move |input: TokenSlice<'a>| {
-        let mut current_err = None;
-
-        for parser in parsers.iter() {
-            match parser(input) {
-                Ok((input, result)) => return Ok((input, result)),
-                Err(e) => {
-                    current_err = match current_err {
-                        None => Some(e),
-                        Some(current_err) => {
-                            if e.error_token.is_some() && current_err.error_token.is_none() {
-                                let expected = current_err
-                                    .expected
-                                    .iter()
-                                    .chain(e.expected.iter())
-                                    .cloned()
-                                    .collect();
-                                let best = match current_err.valid_start {
-                                    true => current_err,
-                                    false => e,
-                                };
-                                Some(not_it(
-                                    best.error_token,
-                                    best.valid_start,
-                                    best.recovery,
-                                    expected,
-                                ))
-                            } else {
-                                Some(current_err)
-                            }
-                        }
+) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, Vec<(T, Space, Option<Space>)>>> {
+    Box::new(move |input| {
+        many0(
+            parser
+                .chain(ws0)
+                .chain(opt_token(TokenKind::Comma))
+                .chain(|input| {
+                    let (input, comma) = opt_token(TokenKind::Comma)(input).unwrap();
+                    if let Some(_) = comma {
+                        let (input, space) = ws0(input).unwrap();
+                        Ok((input, Some(space)))
+                    } else {
+                        Ok((input, None))
                     }
-                }
-            }
-        }
-
-        Err(current_err.expect("No parsers provided to alt"))
-    }
+                })
+                .flattened()
+                .map_result(&|(value, space1, comma, space2)| (value, space1, None)),
+        )
+        .parse(input)
+    })
 }

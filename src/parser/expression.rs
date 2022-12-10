@@ -2,15 +2,15 @@ use crate::fst::{CallExpression, Expression, IdentSegment, NumberSegment, Segmen
 
 use super::{
     arguments::parse_arguments,
-    common::{alt, parse_ident, token, ws0},
+    common::{parse_ident, token, ws0},
     core::{ParseResult, Parser, TokenSlice},
     lexer::TokenKind,
 };
 
 pub fn parse_expression(input: TokenSlice) -> ParseResult<Expression> {
-    let p1 = Box::new(parse_call);
-    let p2 = parse_segment.map_result(Expression::Segment);
-    alt(vec![p2, p1])(input)
+    parse_call
+        .alt(parse_segment.map_result(Expression::Segment))
+        .parse(input)
 }
 
 pub fn parse_call(input: TokenSlice) -> ParseResult<Expression> {
@@ -47,11 +47,10 @@ fn parse_number(input: TokenSlice) -> ParseResult<Segment> {
 }
 
 fn parse_segment(input: TokenSlice) -> ParseResult<Segment> {
-    alt(vec![
-        parse_ident
-            .chain(&ws0)
-            .flattened()
-            .map_result(|(ident, right_space)| Segment::Ident(IdentSegment { ident, right_space })),
-        Box::new(parse_number),
-    ])(input)
+    parse_ident
+        .chain(&ws0)
+        .flattened()
+        .map_result(|(ident, right_space)| Segment::Ident(IdentSegment { ident, right_space }))
+        .alt(parse_number)
+        .parse(input)
 }

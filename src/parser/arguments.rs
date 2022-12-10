@@ -9,8 +9,8 @@ use super::{
 pub fn parse_arguments(input: TokenSlice) -> ParseResult<Arguments> {
     comma_separated(parse_expression)
         .map_result(|args| {
-            args.iter()
-                .map(|arg| Argument::new(arg.0, arg.1, arg.2))
+            args.into_iter()
+                .map(|(expr, space1, space2)| Argument::new(expr, space1, space2))
                 .collect()
         })
         .parse(input)
