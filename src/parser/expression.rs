@@ -9,7 +9,7 @@ use super::{
 
 pub fn parse_expression(input: TokenSlice) -> ParseResult<Expression> {
     parse_call
-        .alt(parse_segment.map_result(Expression::Segment))
+        .alt(parse_segment.map_result(&Expression::Segment))
         .parse(input)
 }
 
@@ -23,7 +23,7 @@ pub fn parse_call(input: TokenSlice) -> ParseResult<Expression> {
         .chain(&ws0)
         .flattened()
         .map_result(
-            |(name, space_ident_lparen, _, space_lparen_arg1, args, _, right_space)| {
+            &|(name, space_ident_lparen, _, space_lparen_arg1, args, _, right_space)| {
                 Expression::Call(CallExpression {
                     name,
                     space_ident_lparen,
@@ -50,7 +50,7 @@ fn parse_segment(input: TokenSlice) -> ParseResult<Segment> {
     parse_ident
         .chain(&ws0)
         .flattened()
-        .map_result(|(ident, right_space)| Segment::Ident(IdentSegment { ident, right_space }))
+        .map_result(&|(ident, right_space)| Segment::Ident(IdentSegment { ident, right_space }))
         .alt(parse_number)
         .parse(input)
 }

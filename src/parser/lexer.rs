@@ -3,7 +3,7 @@ use logos::{Logos, Span};
 
 #[derive(Logos, Debug, PartialEq, EnumKind, Clone)]
 #[enum_kind(TokenKind, derive(Hash))]
-pub enum Token<'a> {
+pub enum Token {
     #[token("fn")]
     Fn,
     #[token("if")]
@@ -23,26 +23,26 @@ pub enum Token<'a> {
     #[token(",")]
     Comma,
 
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
-    Ident(&'a str),
-    #[regex("[0-9]+")]
-    Number(&'a str),
+    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
+    Ident(String),
+    #[regex("[0-9]+", |lex| lex.slice().to_string())]
+    Number(String),
 
     #[token(";")]
     Semi,
 
-    #[regex(r"([ \t\n\f])+")]
-    Whitespace(&'a str),
-    #[regex(r"//.*(\n|)")]
-    SingleLineComment(&'a str),
-    #[regex(r"/\*(.|\n)*\*/")]
-    MultiLineComment(&'a str),
+    #[regex(r"([ \t\n\f])+", |lex| lex.slice().to_string())]
+    Whitespace(String),
+    #[regex(r"//.*(\n|)", |lex| lex.slice().to_string())]
+    SingleLineComment(String),
+    #[regex(r"/\*(.|\n)*\*/", |lex| lex.slice().to_string())]
+    MultiLineComment(String),
 
     #[error]
     Error,
 }
 
-impl Token<'_> {
+impl Token {
     pub fn kind(&self) -> TokenKind {
         TokenKind::from(self)
     }
@@ -59,13 +59,13 @@ impl Token<'_> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LocatedToken<'a> {
-    pub token: Token<'a>,
+pub struct LocatedToken {
+    pub token: Token,
     pub span: Span,
 }
 
-impl<'a> LocatedToken<'a> {
-    pub fn new(token: Token<'a>, span: Span) -> Self {
+impl LocatedToken {
+    pub fn new(token: Token, span: Span) -> Self {
         Self { token, span }
     }
 

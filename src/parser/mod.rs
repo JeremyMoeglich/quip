@@ -17,10 +17,12 @@ mod parameters;
 mod statement;
 
 pub fn parse_fst<'a>(tokens: TokenSlice<'a>) -> ParseResult<'a, Fst> {
-    force_eof(ws0.chain(many0(parse_statement)).flattened())
-        .map_result(|(beginning_space, statements)| Fst::new(beginning_space, statements))(
-        tokens
-    )
+    force_eof(ws0.chain(many0(parse_statement)).flattened()).map_result(&|(
+        beginning_space,
+        statements,
+    )| {
+        Fst::new(beginning_space, statements)
+    })(tokens)
 }
 
 pub fn parse(code: &str) -> Result<Fst, String> {

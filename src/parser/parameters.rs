@@ -1,6 +1,5 @@
 use super::{
-    common::{comma_separated, token},
-    core::Parser,
+    common::{comma_separated, token}, core::Parser,
 };
 use crate::fst::{Parameter, Parameters};
 

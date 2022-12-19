@@ -19,6 +19,6 @@ pub fn parse_code_block<'a>(input: TokenSlice<'a>) -> ParseResult<CodeBlock> {
         .chain(token(TokenKind::RBrace))
         .chain(ws0)
         .flattened()
-        .map_result(|(_, space1, statements, _, space2)| CodeBlock::new(space1, statements, space2))
+        .map_result(&|(_, space1, statements, _, space2)| CodeBlock::new(space1, statements, space2))
         .parse(input)
 }

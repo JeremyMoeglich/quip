@@ -2,7 +2,7 @@ use crate::fst::{Argument, Arguments};
 
 use super::{
     common::comma_separated,
-    core::{ParseResult, Parser, TokenSlice},
+    core::{ParseResult, TokenSlice, Parser},
     expression::parse_expression,
 };
 

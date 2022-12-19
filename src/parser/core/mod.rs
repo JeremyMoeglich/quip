@@ -8,7 +8,9 @@ use flatten::Flatable;
 
 use crate::parser::lexer::{LocatedToken, TokenKind};
 
-pub type TokenSlice<'a> = &'a [LocatedToken<'a>];
+use super::common::map_recovery;
+
+pub type TokenSlice<'a> = &'a [LocatedToken];
 
 pub type RecoveryFunc<'a, T> = Box<dyn FnOnce() -> ParseSuccess<'a, T> + 'a>;
 
@@ -16,7 +18,7 @@ pub type RecoveryFunc<'a, T> = Box<dyn FnOnce() -> ParseSuccess<'a, T> + 'a>;
 #[derivative(Debug)]
 pub struct ParseErrorData<'a, T: Debug + Clone> {
     /// Information about the error and a way to recover from it
-    pub error_token: Option<&'a LocatedToken<'a>>,
+    pub error_token: Option<&'a LocatedToken>,
     pub valid_start: bool, // Whether the parser was able to parse tokens before the error
     #[derivative(Debug = "ignore")]
     pub recovery: RecoveryFunc<'a, T>, // generate a recovery solution,
@@ -25,7 +27,7 @@ pub struct ParseErrorData<'a, T: Debug + Clone> {
 
 impl<'a, T: Debug + Clone> ParseErrorData<'a, T> {
     pub fn new(
-        error_token: Option<&'a LocatedToken<'a>>,
+        error_token: Option<&'a LocatedToken>,
         valid_start: bool,
         recovery: RecoveryFunc<'a, T>,
         expected: HashSet<TokenKind>,
@@ -47,86 +49,88 @@ pub type ParseResult<'a, T: Debug + Clone> = Result<ParseSuccess<'a, T>, ParseEr
 /// The single argument of a parser
 pub type ParserInput<'a> = TokenSlice<'a>;
 
-fn chain<'a, T: Debug + Clone + 'a, U: Debug + Clone + 'a>(
-    f1: impl SingleParser<'a, T> + 'a,
-    f2: impl SingleParser<'a, U> + 'a,
-) -> impl SingleParser<'a, (T, U)> + 'a {
-    move |input| {
-        let result1 = f1(input);
-        match result1 {
-            Ok((input, output1)) => match f2.parse(input) {
-                Ok((input, output2)) => Ok((input, (output1, output2))),
-                Err(err2) => Err(ParseErrorData::new(
-                    err2.error_token,
-                    true,
-                    Box::new(move || {
-                        let (input, output2) = (err2.recovery)();
-                        (input, (output1, output2))
-                    }),
-                    err2.expected,
-                )),
-            },
-            Err(err1) => Err(ParseErrorData::new(
-                err1.error_token,
-                err1.valid_start,
-                Box::new(move || {
-                    let (input, output1) = (err1.recovery)();
-                    match f2.parse(input) {
-                        Ok((input, output2)) => (input, (output1, output2)),
-                        Err(err2) => {
-                            let (input, output2) = (err2.recovery)();
-                            (input, (output1, output2))
-                        }
-                    }
-                }),
-                err1.expected,
-            )),
-        }
-    }
-}
-
-pub trait SingleParser<'a, T: Debug + Clone + 'a> {
+pub trait Parser: Sized {
+    type Output: Debug + Clone;
     /// use the parser
-    fn final_parse(self, input: ParserInput<'a>) -> ParseResult<'a, T>;
-    fn final_force(self, input: ParserInput<'a>) -> ParseSuccess<'a, T> {
-        let result = self.final_parse(input);
+    fn parse<'a>(&self, input: ParserInput<'a>) -> ParseResult<'a, Self::Output>;
+    fn force<'a>(&self, input: ParserInput<'a>) -> ParseSuccess<'a, Self::Output> {
+        let result = self.parse(input);
         match result {
             Ok((input, output)) => (input, output),
             Err(err) => (err.recovery)(),
         }
     }
-    fn map_result<U: Debug + Clone + 'a>(
+    fn map_result<U: Debug + Clone, F: Fn(Self::Output) -> U>(
         self,
-        f: impl Fn(T) -> U + 'a,
-    ) -> Box<dyn FnOnce(ParserInput<'a>) -> ParseResult<'a, U> + 'a> {
+        f: F,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, U>> {
+        Box::new(
+            for<'a> move |input: ParserInput<'a>| -> ParseResult<'a, U> {
+                let result = self.parse(input);
+                match result {
+                    Ok((input, output)) => Ok((input, f(output))),
+                    Err(err) => Err(not_it(
+                        err.error_token,
+                        err.valid_start,
+                        Box::new(move || {
+                            let (input, output) = (err.recovery)();
+                            (input, f(output))
+                        }),
+                        err.expected,
+                    )),
+                }
+            },
+        )
+    }
+    /// Take two parsers and combine them into one
+    fn chain<U: Debug + Clone + 'static>(
+        self,
+        f: impl Parser<Output = U> + 'static,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, (Self::Output, U)>>
+    where
+        Self: 'static,
+    {
         Box::new(move |input| {
-            let result = self.parse(input);
-            match result {
-                Ok((input, output)) => Ok((input, f(output))),
-                Err(err) => Err(not_it(
-                    err.error_token,
-                    err.valid_start,
+            let result1 = self.parse(input);
+            match result1 {
+                Ok((input, output1)) => match f.parse(input) {
+                    Ok((input, output2)) => Ok((input, (output1, output2))),
+                    Err(err2) => Err(ParseErrorData::new(
+                        err2.error_token,
+                        true,
+                        Box::new(move || {
+                            let (input, output2) = (err2.recovery)();
+                            (input, (output1, output2))
+                        }),
+                        err2.expected,
+                    )),
+                },
+                Err(err1) => Err(ParseErrorData::new(
+                    err1.error_token,
+                    err1.valid_start,
                     Box::new(move || {
-                        let (input, output) = (err.recovery)();
-                        (input, f(output))
+                        let (input, output1) = (err1.recovery)();
+                        match f.parse(input) {
+                            Ok((input, output2)) => (input, (output1, output2)),
+                            Err(err2) => {
+                                let (input, output2) = (err2.recovery)();
+                                (input, (output1, output2))
+                            }
+                        }
                     }),
-                    err.expected,
+                    err1.expected,
                 )),
             }
         })
     }
-    /// Take two parsers and combine them into one
-    fn chain<U: Debug + Clone + 'a>(
-        &self,
-        f: impl Parser<'a, U> + 'a,
-    ) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, (T, U)> + 'a> {
-        chain(self, f)
-    }
 
     fn alt(
         self,
-        f: impl Parser<'a, T> + 'a,
-    ) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, T> + 'a> {
+        f: impl Parser<Output = Self::Output> + 'static,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, Self::Output>>
+    where
+        Self: 'static,
+    {
         Box::new(move |input| {
             let result1 = self.parse(input);
             match result1 {
@@ -150,17 +154,19 @@ pub trait SingleParser<'a, T: Debug + Clone + 'a> {
         })
     }
 
-    fn branch<U: Debug + Clone + 'a>(
+    fn branch<U: Debug + Clone + 'static>(
         self,
-        f1: impl Parser<'a, U> + 'a,
-        f2: impl Parser<'a, U> + 'a,
-    ) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, (T, U)> + 'a> {
-        let second_parser = |self_output: T| {
-            let output_ref = &self_output;
-            move |input| match f1.parse(input) {
-                Ok((input, output1)) => Ok((input, (output_ref.clone(), output1))),
+        f1: impl Parser<Output = U> + 'static,
+        f2: impl Parser<Output = U> + 'static,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, (Self::Output, U)>>
+    where
+        Self: 'static,
+    {
+        Box::new(move |input| match self.parse(input) {
+            Ok((input, self_output)) => match f1.parse(input) {
+                Ok((input, output)) => Ok((input, (self_output, output))),
                 Err(err1) => match f2.parse(input) {
-                    Ok((input, output2)) => Ok((input, (output_ref.clone(), output2))),
+                    Ok((input, output)) => Ok((input, (self_output, output))),
                     Err(err2) => Err(ParseErrorData::new(
                         match err1.valid_start {
                             true => err1.error_token,
@@ -168,41 +174,44 @@ pub trait SingleParser<'a, T: Debug + Clone + 'a> {
                         },
                         err1.valid_start || err2.valid_start,
                         match err1.valid_start {
-                            true => Box::new(move || {
-                                let (input, output1) = (err1.recovery)();
-                                (input, (output_ref.clone(), output1))
-                            }),
-                            false => Box::new(move || {
-                                let (input, output2) = (err2.recovery)();
-                                (input, (output_ref.clone(), output2))
-                            }),
+                            true => map_recovery(err1.recovery, |output| (self_output, output)),
+                            false => map_recovery(err2.recovery, |output| (self_output, output)),
                         },
                         err1.expected.union(&err2.expected).cloned().collect(),
                     )),
                 },
-            }
-        };
-        Box::new(move |input| {
-            let self_result = self.parse(input);
-            match self_result {
-                Ok((input, self_output)) => second_parser(self_output)(input),
-                Err(self_error) => Err(not_it(
-                    self_error.error_token,
-                    self_error.valid_start,
-                    Box::new(move || {
-                        let (input, self_output) = (self_error.recovery)();
-                        second_parser(self_output).force(input)
-                    }),
-                    self_error.expected,
-                )),
-            }
+            },
+            Err(self_error) => Err(not_it(
+                self_error.error_token,
+                self_error.valid_start,
+                Box::new(move || {
+                    let (input, self_output) = (self_error.recovery)();
+                    match f1.parse(input) {
+                        Ok((input, output)) => (input, (self_output, output)),
+                        Err(err1) => match f2.parse(input) {
+                            Ok((input, output)) => (input, (self_output, output)),
+                            Err(err2) => {
+                                let (input, output) = match err1.valid_start {
+                                    true => (err1.recovery)(),
+                                    false => (err2.recovery)(),
+                                };
+                                (input, (self_output, output))
+                            }
+                        },
+                    }
+                }),
+                self_error.expected,
+            )),
         })
     }
 
     /// flatten nested tuples to a single tuple ((p1, p2), p3) -> ((r1, r2), r3) -> (r1, r2, r3)
-    fn flattened<O: Clone + Debug>(self) -> Box<dyn Fn(ParserInput<'a>) -> ParseResult<'a, O> + 'a>
+    fn flattened<O: Clone + Debug>(
+        self,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, O>>
     where
-        T: Flatable<Flattened = O>,
+        Self::Output: Flatable<Flattened = O>,
+        Self: 'static,
     {
         Box::new(move |input| {
             let result = self.parse(input);
@@ -222,28 +231,18 @@ pub trait SingleParser<'a, T: Debug + Clone + 'a> {
     }
 }
 
-pub trait Parser<'a, T: Debug + Clone + 'a>: SingleParser<'a, T> {
-    fn parse(self, input: ParserInput<'a>) -> ParseResult<'a, T>;
-    fn force(&self, input: ParserInput<'a>) -> ParseSuccess<'a, T> {
-        let result = self.parse(input);
-        match result {
-            Ok((input, output)) => (input, output),
-            Err(err) => (err.recovery)(),
-        }
-    }
-}
-
-impl<'a, P, T: Debug + Clone + 'a> SingleParser<'a, T> for P
+impl<T: Debug + Clone, P> Parser for P
 where
-    P: FnOnce(TokenSlice<'a>) -> ParseResult<'a, T>,
+    P: for<'b> Fn(TokenSlice<'b>) -> ParseResult<'b, T>,
 {
-    fn final_parse(self, input: ParserInput<'a>) -> ParseResult<'a, T> {
+    type Output = T;
+    fn parse<'a>(&self, input: ParserInput<'a>) -> ParseResult<'a, T> {
         self(input)
     }
 }
 
 pub fn not_it<'a, T: Debug + Clone>(
-    error_token: Option<&'a LocatedToken<'a>>,
+    error_token: Option<&'a LocatedToken>,
     valid_start: bool,
     recovery: RecoveryFunc<'a, T>,
     expected: HashSet<TokenKind>,
