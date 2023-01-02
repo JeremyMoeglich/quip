@@ -16,10 +16,10 @@ pub fn parse_expression(input: TokenSlice) -> ParseResult<Expression> {
 pub fn parse_call(input: TokenSlice) -> ParseResult<Expression> {
     parse_ident
         .chain(&ws0)
-        .chain(token(TokenKind::LParen))
+        .chain(&token(TokenKind::LParen))
         .chain(&ws0)
         .chain(&parse_arguments)
-        .chain(token(TokenKind::RParen))
+        .chain(&token(TokenKind::RParen))
         .chain(&ws0)
         .flattened()
         .map_result(
@@ -38,7 +38,7 @@ pub fn parse_call(input: TokenSlice) -> ParseResult<Expression> {
 fn parse_number(input: TokenSlice) -> ParseResult<Segment> {
     token(TokenKind::Number)
         .chain(&ws0)
-        .map_result(|(number, right_space)| {
+        .map_result(&|(number, right_space)| {
             Segment::Number(NumberSegment {
                 number: number.string(),
                 right_space,

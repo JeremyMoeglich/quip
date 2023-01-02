@@ -1,4 +1,5 @@
 pub mod flatten;
+pub mod chaining;
 
 use std::{collections::HashSet, fmt::Debug};
 
@@ -50,7 +51,7 @@ pub type ParseResult<'a, T: Debug + Clone> = Result<ParseSuccess<'a, T>, ParseEr
 pub type ParserInput<'a> = TokenSlice<'a>;
 
 pub trait Parser: Sized {
-    type Output: Debug + Clone;
+    type Output: Debug + Clone + 'static;
     /// use the parser
     fn parse<'a>(&self, input: ParserInput<'a>) -> ParseResult<'a, Self::Output>;
     fn force<'a>(&self, input: ParserInput<'a>) -> ParseSuccess<'a, Self::Output> {
@@ -62,8 +63,11 @@ pub trait Parser: Sized {
     }
     fn map_result<U: Debug + Clone, F: Fn(Self::Output) -> U>(
         self,
-        f: F,
-    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, U>> {
+        f: &'static F,
+    ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, U>>
+    where
+        Self: 'static,
+    {
         Box::new(
             for<'a> move |input: ParserInput<'a>| -> ParseResult<'a, U> {
                 let result = self.parse(input);
@@ -84,8 +88,8 @@ pub trait Parser: Sized {
     }
     /// Take two parsers and combine them into one
     fn chain<U: Debug + Clone + 'static>(
-        self,
-        f: impl Parser<Output = U> + 'static,
+        &'static self,
+        f: &'static impl Parser<Output = U>,
     ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, (Self::Output, U)>>
     where
         Self: 'static,
@@ -156,8 +160,8 @@ pub trait Parser: Sized {
 
     fn branch<U: Debug + Clone + 'static>(
         self,
-        f1: impl Parser<Output = U> + 'static,
-        f2: impl Parser<Output = U> + 'static,
+        f1: &'static impl Parser<Output = U>,
+        f2: &'static impl Parser<Output = U>,
     ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, (Self::Output, U)>>
     where
         Self: 'static,
@@ -174,8 +178,12 @@ pub trait Parser: Sized {
                         },
                         err1.valid_start || err2.valid_start,
                         match err1.valid_start {
-                            true => map_recovery(err1.recovery, |output| (self_output, output)),
-                            false => map_recovery(err2.recovery, |output| (self_output, output)),
+                            true => map_recovery(err1.recovery, move |output| {
+                                (self_output.clone(), output)
+                            }),
+                            false => map_recovery(err2.recovery, move |output| {
+                                (self_output.clone(), output)
+                            }),
                         },
                         err1.expected.union(&err2.expected).cloned().collect(),
                     )),
@@ -231,7 +239,7 @@ pub trait Parser: Sized {
     }
 }
 
-impl<T: Debug + Clone, P> Parser for P
+impl<T: Debug + Clone + 'static, P> Parser for P
 where
     P: for<'b> Fn(TokenSlice<'b>) -> ParseResult<'b, T>,
 {

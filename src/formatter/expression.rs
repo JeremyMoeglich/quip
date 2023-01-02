@@ -73,5 +73,6 @@ fn format_segment(segment: &Segment) -> String {
     match segment {
         Segment::Ident(ident_segment) => format_spaced(ident_segment),
         Segment::Number(number_segment) => format_spaced(number_segment),
+        Segment::Error => todo!(),
     }
 }

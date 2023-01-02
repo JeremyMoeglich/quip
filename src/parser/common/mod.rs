@@ -77,7 +77,7 @@ pub fn parse_ident<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Ident> {
     }
 }
 
-pub fn map_recovery<'a, T, U>(
+pub fn map_recovery<'a, T: 'static, U>(
     recovery: RecoveryFunc<'a, T>,
     f: impl Fn(T) -> U + 'a,
 ) -> RecoveryFunc<'a, U> {
@@ -160,13 +160,13 @@ fn parse_space_part<'a>(input: TokenSlice<'a>) -> ParseResult<'a, SpacePart> {
 
 type ManyParserCheckOption<T, U> = Option<Box<dyn Fn(Option<U>, T) -> (U, bool)>>;
 
-struct ManyParser<T: Debug + Clone, P: Parser<Output = T>, U = ()> {
+struct ManyParser<T: Debug + Clone + 'static, P: Parser<Output = T>, U = ()> {
     parser: P,
     min_amount: usize,
     check: ManyParserCheckOption<T, U>,
 }
 
-impl<T: Clone + Debug, P: Parser<Output = T>, U> Parser for ManyParser<T, P, U> {
+impl<T: Clone + Debug + 'static, P: Parser<Output = T>, U> Parser for ManyParser<T, P, U> {
     type Output = Vec<T>;
     fn parse<'b>(&self, mut input: ParserInput<'b>) -> ParseResult<'b, Vec<T>> {
         let mut amount = 0;
@@ -203,18 +203,20 @@ impl<T: Clone + Debug, P: Parser<Output = T>, U> Parser for ManyParser<T, P, U> 
             let final_error = final_error.unwrap();
             Err(not_it(
                 final_error.error_token,
-                false,
-                map_recovery(final_error.recovery, |r| {
-                    result.push(r);
-                    result
-                }),
+                amount > 0 || final_error.valid_start,
+                match final_error.valid_start {
+                    false => Box::new(move || (input, result)),
+                    true => map_recovery(final_error.recovery, move |v| {
+                        result.iter().cloned().chain(std::iter::once(v)).collect()
+                    }),
+                },
                 final_error.expected,
             ))
         }
     }
 }
 
-impl<T: Clone + Debug, P: Parser<Output = T>, U> ManyParser<T, P, U> {
+impl<T: Clone + Debug + 'static, P: Parser<Output = T>, U> ManyParser<T, P, U> {
     fn new(parser: P, min_amount: usize, check: ManyParserCheckOption<T, U>) -> Self {
         Self {
             parser,
@@ -222,7 +224,7 @@ impl<T: Clone + Debug, P: Parser<Output = T>, U> ManyParser<T, P, U> {
             check,
         }
     }
-    fn check(self, check: impl Fn(Option<U>, T) -> (U, bool)) -> Self {
+    fn check(self, check: impl Fn(Option<U>, T) -> (U, bool) + 'static) -> Self {
         Self {
             parser: self.parser,
             min_amount: self.min_amount,
@@ -231,28 +233,32 @@ impl<T: Clone + Debug, P: Parser<Output = T>, U> ManyParser<T, P, U> {
     }
 }
 
-fn many<'p, 's, T: Debug + Clone, P: Parser<Output = T>, U>(
+fn many<'p, 's, T: Debug + Clone + 'static, P: Parser<Output = T>, U>(
     f: P,
     min_amount: usize,
 ) -> ManyParser<T, P, U> {
     ManyParser::new(f, min_amount, None)
 }
 
-pub fn many0<'p, 's, T: Debug + Clone, P: Parser<Output = T>>(f: P) -> ManyParser<T, P, ()> {
+pub fn many0<'p, 's, T: Debug + Clone + 'static, P: Parser<Output = T>>(
+    f: P,
+) -> ManyParser<T, P, ()> {
     many(f, 0)
 }
 
-pub fn many1<'p, 's, T: Debug + Clone, P: Parser<Output = T>>(f: P) -> ManyParser<T, P, ()> {
+pub fn many1<'p, 's, T: Debug + Clone + 'static, P: Parser<Output = T>>(
+    f: P,
+) -> ManyParser<T, P, ()> {
     many(f, 1)
 }
 
-pub fn checked_many0<'p, 's, T: Debug + Clone, P: Parser<Output = T>, U>(
+pub fn checked_many0<'p, 's, T: Debug + Clone + 'static, P: Parser<Output = T>, U>(
     f: P,
 ) -> ManyParser<T, P, U> {
     many(f, 0)
 }
 
-pub fn checked_many1<'p, 's, T: Debug + Clone, P: Parser<Output = T>, U>(
+pub fn checked_many1<'p, 's, T: Debug + Clone + 'static, P: Parser<Output = T>, U>(
     f: P,
 ) -> ManyParser<T, P, U> {
     many(f, 1)
@@ -275,7 +281,7 @@ pub fn opt<'a, T: Debug + Clone + 'a>(
     }
 }
 
-pub fn force_eof<'s, T: Debug + Clone, P: Parser<Output = T> + 's>(
+pub fn force_eof<'s, T: Debug + Clone + 'static, P: Parser<Output = T> + 's>(
     parser: P,
 ) -> Box<dyn for<'a> Fn(TokenSlice<'a>) -> ParseResult<'a, T> + 's> {
     Box::new(move |input| {
@@ -293,25 +299,27 @@ pub fn force_eof<'s, T: Debug + Clone, P: Parser<Output = T> + 's>(
     })
 }
 
-pub fn comma_separated<T: Debug + Clone + BaseElement>(
-    parser: impl Parser<Output = T>,
+pub fn comma_separated<T: Debug + Clone + BaseElement + 'static>(
+    parser: &'static impl Parser<Output = T>,
 ) -> Box<dyn for<'a> Fn(ParserInput<'a>) -> ParseResult<'a, Vec<(T, Space, Option<Space>)>>> {
     Box::new(move |input| {
         checked_many0(
-            parser
-                .chain(ws0)
-                .chain(opt_token(TokenKind::Comma))
-                .chain(|input| {
-                    let (input, comma) = opt_token(TokenKind::Comma)(input).unwrap();
-                    if let Some(_) = comma {
-                        let (input, space) = ws0(input).unwrap();
-                        Ok((input, Some(space)))
-                    } else {
-                        Ok((input, None))
-                    }
-                })
-                .flattened()
-                .map_result(&|(value, space1, comma, space2)| (value, space1, None)),
+            {
+                parser
+                    .chain(&ws0)
+                    .chain(&opt_token(TokenKind::Comma))
+                    .chain(&|input| {
+                        let (input, comma) = opt_token(TokenKind::Comma)(input).unwrap();
+                        if let Some(_) = comma {
+                            let (input, space) = ws0(input).unwrap();
+                            Ok((input, Some(space)))
+                        } else {
+                            Ok((input, None))
+                        }
+                    })
+            }
+            .flattened()
+            .map_result(&|(value, space1, comma, space2)| (value, space1, None)),
         )
         .check(|had_comma, (_, _, space2)| match had_comma {
             Some(had_comma) => match had_comma {

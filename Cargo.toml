@@ -5,6 +5,8 @@ edition = "2021"
 
 
 [dependencies]
+chumsky = "0.8.0"
 derivative = "2.2.0"
 enum-kinds = "0.5.1"
+lazy_static = "1.4.0"
 logos = "0.12.1"

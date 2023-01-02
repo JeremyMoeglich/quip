@@ -12,7 +12,7 @@ use super::{
 pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> {
     parse_extern.alt(parse_function).alt(
         parse_expression
-            .chain(opt_token(TokenKind::Semi))
+            .chain(&opt_token(TokenKind::Semi))
             .map_result(&|(expr, semi)| match semi {
                 Some(_semi) => todo!(),
                 None => Statement::ImplicitReturn(expr),
@@ -23,12 +23,12 @@ pub fn parse_statement<'a>(input: TokenSlice<'a>) -> ParseResult<'a, Statement> 
 fn parse_extern(input: TokenSlice) -> ParseResult<Statement> {
     token(TokenKind::Extern)
         .chain(&ws1)
-        .chain(parse_ident)
+        .chain(&parse_ident)
         .chain(&ws0)
-        .chain(token(TokenKind::LParen))
+        .chain(&token(TokenKind::LParen))
         .chain(&ws0)
-        .chain(parse_parameters)
-        .chain(token(TokenKind::RParen))
+        .chain(&parse_parameters)
+        .chain(&token(TokenKind::RParen))
         .chain(&ws0)
         .flattened()
         .map_result(
@@ -60,10 +60,10 @@ fn parse_function(input: TokenSlice) -> ParseResult<Statement> {
         .chain(&ws1)
         .chain(&parse_ident)
         .chain(&ws0)
-        .chain(token(TokenKind::LParen))
+        .chain(&token(TokenKind::LParen))
         .chain(&ws0)
         .chain(&parse_parameters)
-        .chain(token(TokenKind::RParen))
+        .chain(&token(TokenKind::RParen))
         .chain(&ws0)
         .chain(&parse_code_block)
         .chain(&ws0)

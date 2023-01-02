@@ -17,7 +17,7 @@ mod parameters;
 mod statement;
 
 pub fn parse_fst<'a>(tokens: TokenSlice<'a>) -> ParseResult<'a, Fst> {
-    force_eof(ws0.chain(many0(parse_statement)).flattened()).map_result(&|(
+    force_eof(ws0.chain(&many0(parse_statement)).flattened()).map_result(&|(
         beginning_space,
         statements,
     )| {
