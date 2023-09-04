@@ -265,14 +265,14 @@ pub fn separated_list1<'a, O, E>(
     }
 }
 
-pub fn delimited<'a, O, E>(
-    start: impl Fn(&Span<'a>) -> ParserResult<'a, (), E>,
-    end: impl Fn(&Span<'a>) -> ParserResult<'a, (), E>,
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
+pub fn delimited<'a, O, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>(
+    start: impl Fn(&Span<'a>) -> ParserResult<'a, (), E1>,
+    end: impl Fn(&Span<'a>) -> ParserResult<'a, (), E2>,
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E3>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
-        
+
         // Parse the start delimiter
         let (rest, _) = start(&input)?;
         input = rest;
@@ -290,7 +290,7 @@ pub fn delimited<'a, O, E>(
 }
 
 #[derive(Error, Debug)]
-enum TokenParserSubError {
+pub enum TokenParserSubError {
     #[error("The token was not the expected kind")]
     WrongTokenKind,
 }
@@ -311,12 +311,54 @@ pub fn token<'a>(
     }
 }
 
+#[macro_export]
+macro_rules! extract_token_data {
+    ($located_token:expr, $token_kind:ident) => {
+        match $located_token.token {
+            Token::$token_kind(data) => Some(data),
+            _ => None,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! token_parser {
+    (data $token_kind:ident) => {
+        move |input: &Span<'_>| {
+            let (input, first_span) = input.take_n_token(1)?;
+            let first = &first_span.tokens[0];
+            if first.kind() == TokenKind::$token_kind {
+                match first.token {
+                    Token::$token_kind(data) => Ok((input, data)),
+                    _ => Err(crate::core::TokenParserSubError::WrongTokenKind.into()),
+                }
+            } else {
+                Err(crate::core::TokenParserSubError::WrongTokenKind.into())
+            }
+        }
+    };
+    (nodata $token_kind:ident) => {
+        move |input: &Span<'_>| {
+            let (input, first_span) = input.take_n_token(1)?;
+            let first = &first_span.tokens[0];
+            if first.kind() == TokenKind::$token_kind {
+                match first.token {
+                    crate::lexer::Token::$token_kind => Ok((input, ())),
+                    _ => Err(crate::core::TokenParserSubError::WrongTokenKind.into()),
+                }
+            } else {
+                Err(crate::core::TokenParserSubError::WrongTokenKind.into())
+            }
+        }
+    };
+}
+
 pub trait Alt<'a, O, E> {
-    fn backtrack_alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
+    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
 }
 
 impl<'a, O, E, P: Fn(&Span) -> ParserResult<'a, O, E>> Alt<'a, O, E> for (P,) {
-    fn backtrack_alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
+    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
         move |input: &Span<'a>| (self.0)(input)
     }
 }
@@ -330,7 +372,7 @@ macro_rules! tuple_index {
 macro_rules! impl_alt {
     ($($name:ident, $idx:tt),+) => {
         impl<'a, Out, Err, $($name: Fn(&Span) -> ParserResult<'a, Out, Err>),+> Alt<'a, Out, Err> for ($($name,)+) {
-            fn backtrack_alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out, Err> {
+            fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out, Err> {
                 move |input: &Span<'a>| {
                     let mut err = None;
                     $(
@@ -359,6 +401,77 @@ macro_rules! impl_alts {
 impl_alts!(
     A, 0, B, 1, C, 2, D, 3, E, 4, F, 5, G, 6, H, 7, I, 8, J, 9, K, 10, L, 11, M, 12, N, 13, O, 14,
     P, 15
+);
+
+pub trait Tuple<'a, O, E> {
+    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
+}
+
+impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> Tuple<'a, (O,), E> for (P,) {
+    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, (O,), E> {
+        move |input: &Span<'a>| {
+            let (rest, o) = (self.0)(input)?;
+            Ok((rest, (o,)))
+        }
+    }
+}
+
+macro_rules! impl_tuple {
+    ($($name:ident : $O:ident, $idx:tt),+) => {
+        impl<'a, Err, $($name: Fn(&Span<'a>) -> ParserResult<'a, $O, Err>),+, $($O,)+> Tuple<'a, ($($O,)+), Err> for ($($name,)+) {
+            fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, ($($O,)+), Err> {
+                move |input: &Span<'a>| {
+                    let mut input = input.clone();
+                    $(
+                        let (rest, $name) = tuple_index!(self, $idx)(&input)?;
+                        input = rest;
+                    )*
+                    Ok((input, ($($name,)+)))
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_tuples {
+    ($($name:ident : $O:ident, $idx:tt),+) => {
+        impl_tuple!($($name : $O, $idx),+);
+    };
+}
+
+impl_tuples!(
+    A: O1,
+    0,
+    B: O2,
+    1,
+    C: O3,
+    2,
+    D: O4,
+    3,
+    E: O5,
+    4,
+    F: O6,
+    5,
+    G: O7,
+    6,
+    H: O8,
+    7,
+    I: O9,
+    8,
+    J: O10,
+    9,
+    K: O11,
+    10,
+    L: O12,
+    11,
+    M: O13,
+    12,
+    N: O14,
+    13,
+    O: O15,
+    14,
+    P: O16,
+    15
 );
 
 #[derive(Error, Debug)]
