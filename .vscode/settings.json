@@ -6,5 +6,6 @@
         "lparen",
         "metavar",
         "rparen"
-    ]
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
 }
