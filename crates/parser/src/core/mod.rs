@@ -407,17 +407,8 @@ pub trait Tuple<'a, O, E> {
     fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
 }
 
-impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> Tuple<'a, (O,), E> for (P,) {
-    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, (O,), E> {
-        move |input: &Span<'a>| {
-            let (rest, o) = (self.0)(input)?;
-            Ok((rest, (o,)))
-        }
-    }
-}
-
 macro_rules! impl_tuple {
-    ($($name:ident : $O:ident, $idx:tt),+) => {
+    ($($name:ident: $O:ident: $idx:tt),+) => {
         impl<'a, Err, $($name: Fn(&Span<'a>) -> ParserResult<'a, $O, Err>),+, $($O,)+> Tuple<'a, ($($O,)+), Err> for ($($name,)+) {
             fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, ($($O,)+), Err> {
                 move |input: &Span<'a>| {
@@ -433,45 +424,42 @@ macro_rules! impl_tuple {
     };
 }
 
+macro_rules! reverse_and_call {
+    ([] $($reversed:tt)*) => {
+        impl_tuples!($($reversed)*);
+    };
+    ([$first:tt $($rest:tt)*] $($reversed:tt)*) => {
+        reverse_and_call!([$($rest)*] $first $($reversed)* )
+    };
+}
+
+macro_rules! remove_last_and_reverse {
+    ($first:tt, $($rest:tt),*) => {
+        reverse_and_call!([$($rest),*])
+    };
+}
+
+macro_rules! reverse_and_remove_last {
+    ([] $($reversed:tt)*) => {
+        remove_last_and_reverse!($($reversed)*);
+    };
+    ([$first:tt $($rest:tt)*] $($reversed:tt)*) => {
+        reverse_and_remove_last!([$($rest)*] $first $($reversed)* )
+    };
+}
+
 macro_rules! impl_tuples {
-    ($($name:ident : $O:ident, $idx:tt),+) => {
-        impl_tuple!($($name : $O, $idx),+);
+    ($x:tt) => {
+        impl_tuple!($x);
+    };
+    ($($x:tt),+) => {
+        impl_tuple!($($x),*);
+        reverse_and_remove_last!([$($x),+]);
     };
 }
 
 impl_tuples!(
-    A: O1,
-    0,
-    B: O2,
-    1,
-    C: O3,
-    2,
-    D: O4,
-    3,
-    E: O5,
-    4,
-    F: O6,
-    5,
-    G: O7,
-    6,
-    H: O8,
-    7,
-    I: O9,
-    8,
-    J: O10,
-    9,
-    K: O11,
-    10,
-    L: O12,
-    11,
-    M: O13,
-    12,
-    N: O14,
-    13,
-    O: O15,
-    14,
-    P: O16,
-    15
+    (A: O1: 0), (B: O2: 1), (C: O3: 2), (D: O4: 3), (E: O5: 4), (F: O6: 5), (G: O7: 6), (H: O8: 7), (I: O9: 8), (J: O10: 9), (K: O11: 10), (L: O12: 11), (M: O13: 12), (N: O14: 13), (O: O15: 14), (P: O16: 15)
 );
 
 #[derive(Error, Debug)]
