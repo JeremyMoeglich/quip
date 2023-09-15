@@ -1,30 +1,19 @@
 #![allow(dead_code)]
 
-use super::ast::{Space, Whitespace};
-use crate::{core::{ParserResult, Span, TokenParserError}, ast::Location};
+use ast::Whitespace;
+use parser_core::*;
+use lexer::{Token, TokenKind};
 use thiserror::Error;
 
 // Utils for parsing
 
-fn parse_blank<'a>(input: Span<'a>) -> ParserResult<'a, (), TokenParserError> {
-    let mut total = 0;
-    for c in input.fragment().chars() {
-        if c == '\t' {
-            total += 4;
-        } else {
-            total += 1;
-        }
-    }
-    Ok((input, Space::Blank(total)))
+fn parse_blank<'a>(input: &Span<'a>) -> ParserResult<'a, (), TokenParserError> {
+    let (input, blank) = take_while(|t| t.kind() == TokenKind::Space)(input);
+    Ok((input, ()))
 }
 
-pub fn ws<'a>(input: Span<'a>) -> ParserResult<Span, Whitespace> {
-    let (input, whitespace) = many0(alt((parse_blank, comment)))(input)?;
-    Ok((input, whitespace))
-}
-
-pub fn ws1(input: Span) -> ParserResult<Span, Whitespace> {
-    let (input, whitespace) = many1(alt((comment, parse_blank)))(input)?;
+pub fn ws1(input: Span) -> ParserResult<Span, TakeParserError> {
+    let (input, whitespace) = many1((token_parser!(data LineComment), parse_blank).alt())(&input)?;
     Ok((input, whitespace))
 }
 
@@ -118,5 +107,9 @@ pub fn locate(text: &str, index: usize) -> Location {
             column += 1;
         }
     }
-    Location { line, column, index }
+    Location {
+        line,
+        column,
+        index,
+    }
 }

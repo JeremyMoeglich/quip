@@ -3,10 +3,7 @@ use logos::{internal::LexerInternal, Lexer, Logos};
 use num::{BigInt, Num};
 use std::str::FromStr;
 
-use crate::{
-    ast::{Location, Number},
-    core::{LocatedToken, Span},
-};
+use ast::Number;
 
 #[derive(Logos, Debug, PartialEq, Clone, EnumKind)]
 #[enum_kind(TokenKind)]
@@ -129,6 +126,10 @@ pub enum Token<'a> {
     LineComment(&'a str),
     #[regex(r"/\*", block_comment)]
     BlockComment(&'a str),
+
+    // Whitespace
+    #[regex(r"( |\n|\t)*")]
+    Space,
 
     Error,
 }
@@ -262,48 +263,4 @@ fn raw_string_start<'a>(lex: &mut Lexer<'a, Token<'a>>) -> &'a str {
         }
     }
     &lex.source()[lex.span().start..lex.span().start + end]
-}
-
-pub fn tokenize<'a>(source: &'a str) -> Vec<LocatedToken<'a>> {
-    let mut iter = Token::lexer(source);
-    let mut tokens = Vec::new();
-    let mut location = Location {
-        column: 0,
-        line: 0,
-        index: 0,
-    };
-    while let Some(token) = iter.next() {
-        let token = token.unwrap_or(Token::Error);
-        let range = iter.span();
-        let text = &source[range];
-        let new_lines = text.chars().filter(|c| *c == '\n').count();
-        let column = if new_lines == 0 {
-            location.column + text.len()
-        } else {
-            text.lines().last().unwrap_or("").len()
-        };
-        let located_token = LocatedToken {
-            start: location,
-            text,
-            token,
-        };
-        tokens.push(located_token);
-        location = Location {
-            column,
-            line: location.line + new_lines,
-            index: location.index + text.len(),
-        };
-    }
-    tokens
-}
-
-pub fn create_span<'a>(tokens: &'a [LocatedToken<'a>]) -> Span<'a> {
-    Span {
-        start: Location {
-            column: 0,
-            line: 0,
-            index: 0,
-        },
-        tokens,
-    }
 }

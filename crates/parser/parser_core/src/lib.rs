@@ -1,10 +1,10 @@
-use crate::{
-    ast::Location,
-    combine_errors,
-    lexer::{Token, TokenKind},
-};
-mod error_union;
+#![feature(return_position_impl_trait_in_trait)]
 
+use ast::Location;
+use lexer::{Token, TokenKind};
+mod error_union;
+use logos::Logos;
+use parser_proc::{generate_all_tuple_impls, generate_all_alt_impls};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub struct Span<'a> {
     pub start: Location,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LocatedToken<'a> {
     pub start: Location,
     pub text: &'a str,
@@ -23,6 +23,50 @@ pub struct LocatedToken<'a> {
 impl<'a> LocatedToken<'a> {
     pub fn kind(&self) -> TokenKind {
         self.token.kind()
+    }
+}
+
+pub fn tokenize<'a>(source: &'a str) -> Vec<LocatedToken<'a>> {
+    let mut iter = Token::lexer(source);
+    let mut tokens = Vec::new();
+    let mut location = Location {
+        column: 0,
+        line: 0,
+        index: 0,
+    };
+    while let Some(token) = iter.next() {
+        let token = token.unwrap_or(Token::Error);
+        let range = iter.span();
+        let text = &source[range];
+        let new_lines = text.chars().filter(|c| *c == '\n').count();
+        let column = if new_lines == 0 {
+            location.column + text.len()
+        } else {
+            text.lines().last().unwrap_or("").len()
+        };
+        let located_token = LocatedToken {
+            start: location,
+            text,
+            token,
+        };
+        tokens.push(located_token);
+        location = Location {
+            column,
+            line: location.line + new_lines,
+            index: location.index + text.len(),
+        };
+    }
+    tokens
+}
+
+pub fn create_span<'a>(tokens: &'a [LocatedToken<'a>]) -> Span<'a> {
+    Span {
+        start: Location {
+            column: 0,
+            line: 0,
+            index: 0,
+        },
+        tokens,
     }
 }
 
@@ -98,7 +142,6 @@ impl<'a> Span<'a> {
 
         let (chunk, rest) = self.tokens.split_at(n);
 
-        let last_token = chunk.last().unwrap(); // safe because n > 0
         let rest_start = Location {
             line: rest
                 .first()
@@ -122,6 +165,7 @@ impl<'a> Span<'a> {
 
         Ok((rest_span, chunk_span))
     }
+
     pub fn take_tokens<const N: usize>(
         &self,
     ) -> ParserResult<'a, &'a [LocatedToken<'a>; N], TakeParserError> {
@@ -132,7 +176,7 @@ impl<'a> Span<'a> {
     }
     pub fn take_token(&self) -> ParserResult<'a, LocatedToken<'a>, TakeParserError> {
         let (rest, chunk) = self.take_tokens::<1>()?;
-        Ok((rest, chunk[0]))
+        Ok((rest, chunk[0].clone()))
     }
     pub fn kind(&self) -> Result<TokenKind, TakeParserError> {
         match self.tokens.first() {
@@ -198,8 +242,8 @@ pub fn many1<'a, O, E: Clone>(
     }
 }
 
-pub fn separated_list0<'a, O, E: Clone>(
-    separator: impl Fn(&Span<'a>) -> ParserResult<'a, (), E>,
+pub fn separated_list0<'a, O, O_, E>(
+    separator: impl Fn(&Span<'a>) -> ParserResult<'a, O_, E>,
     parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
     move |input: &Span<'a>| {
@@ -265,10 +309,10 @@ pub fn separated_list1<'a, O, E>(
     }
 }
 
-pub fn delimited<'a, O, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>(
-    start: impl Fn(&Span<'a>) -> ParserResult<'a, (), E1>,
-    end: impl Fn(&Span<'a>) -> ParserResult<'a, (), E2>,
+pub fn delimited<'a, O, O1_, O2_, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>(
+    start: impl Fn(&Span<'a>) -> ParserResult<'a, O1_, E1>,
     parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E3>,
+    end: impl Fn(&Span<'a>) -> ParserResult<'a, O2_, E2>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
@@ -327,13 +371,13 @@ macro_rules! token_parser {
         move |input: &Span<'_>| {
             let (input, first_span) = input.take_n_token(1)?;
             let first = &first_span.tokens[0];
-            if first.kind() == TokenKind::$token_kind {
+            if first.kind() == lexer::TokenKind::$token_kind {
                 match first.token {
                     Token::$token_kind(data) => Ok((input, data)),
-                    _ => Err(crate::core::TokenParserSubError::WrongTokenKind.into()),
+                    _ => Err(parser_core::TokenParserSubError::WrongTokenKind.into()),
                 }
             } else {
-                Err(crate::core::TokenParserSubError::WrongTokenKind.into())
+                Err(parser_core::TokenParserSubError::WrongTokenKind.into())
             }
         }
     };
@@ -341,13 +385,13 @@ macro_rules! token_parser {
         move |input: &Span<'_>| {
             let (input, first_span) = input.take_n_token(1)?;
             let first = &first_span.tokens[0];
-            if first.kind() == TokenKind::$token_kind {
+            if first.kind() == lexer::TokenKind::$token_kind {
                 match first.token {
-                    crate::lexer::Token::$token_kind => Ok((input, ())),
-                    _ => Err(crate::core::TokenParserSubError::WrongTokenKind.into()),
+                    lexer::Token::$token_kind => Ok((input, ())),
+                    _ => Err(parser_core::TokenParserSubError::WrongTokenKind.into()),
                 }
             } else {
-                Err(crate::core::TokenParserSubError::WrongTokenKind.into())
+                Err(parser_core::TokenParserSubError::WrongTokenKind.into())
             }
         }
     };
@@ -357,110 +401,14 @@ pub trait Alt<'a, O, E> {
     fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
 }
 
-impl<'a, O, E, P: Fn(&Span) -> ParserResult<'a, O, E>> Alt<'a, O, E> for (P,) {
-    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
-        move |input: &Span<'a>| (self.0)(input)
-    }
-}
-
-macro_rules! tuple_index {
-    ($tuple:expr, $idx:tt) => {
-        $tuple.$idx
-    };
-}
-
-macro_rules! impl_alt {
-    ($($name:ident, $idx:tt),+) => {
-        impl<'a, Out, Err, $($name: Fn(&Span) -> ParserResult<'a, Out, Err>),+> Alt<'a, Out, Err> for ($($name,)+) {
-            fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out, Err> {
-                move |input: &Span<'a>| {
-                    let mut err = None;
-                    $(
-                        match tuple_index!(self, $idx)(input) {
-                            Ok(res) => return Ok(res),
-                            Err(e) => {
-                                if err.is_none() {
-                                    err = Some(e);
-                                }
-                            }
-                        }
-                    )*
-                    Err(err.unwrap()) // We're guaranteed to have an error if we've made it this far
-                }
-            }
-        }
-    };
-}
-
-macro_rules! impl_alts {
-    ($($name:ident, $idx:tt),+) => {
-        impl_alt!($($name, $idx),+);
-    };
-}
-
-impl_alts!(
-    A, 0, B, 1, C, 2, D, 3, E, 4, F, 5, G, 6, H, 7, I, 8, J, 9, K, 10, L, 11, M, 12, N, 13, O, 14,
-    P, 15
-);
+generate_all_alt_impls!(16);
 
 pub trait Tuple<'a, O, E> {
     fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
 }
 
-macro_rules! impl_tuple {
-    ($($name:ident: $O:ident: $idx:tt),+) => {
-        impl<'a, Err, $($name: Fn(&Span<'a>) -> ParserResult<'a, $O, Err>),+, $($O,)+> Tuple<'a, ($($O,)+), Err> for ($($name,)+) {
-            fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, ($($O,)+), Err> {
-                move |input: &Span<'a>| {
-                    let mut input = input.clone();
-                    $(
-                        let (rest, $name) = tuple_index!(self, $idx)(&input)?;
-                        input = rest;
-                    )*
-                    Ok((input, ($($name,)+)))
-                }
-            }
-        }
-    };
-}
+generate_all_tuple_impls!(16);
 
-macro_rules! reverse_and_call {
-    ([] $($reversed:tt)*) => {
-        impl_tuples!($($reversed)*);
-    };
-    ([$first:tt $($rest:tt)*] $($reversed:tt)*) => {
-        reverse_and_call!([$($rest)*] $first $($reversed)* )
-    };
-}
-
-macro_rules! remove_last_and_reverse {
-    ($first:tt, $($rest:tt),*) => {
-        reverse_and_call!([$($rest),*])
-    };
-}
-
-macro_rules! reverse_and_remove_last {
-    ([] $($reversed:tt)*) => {
-        remove_last_and_reverse!($($reversed)*);
-    };
-    ([$first:tt $($rest:tt)*] $($reversed:tt)*) => {
-        reverse_and_remove_last!([$($rest)*] $first $($reversed)* )
-    };
-}
-
-macro_rules! impl_tuples {
-    ($x:tt) => {
-        impl_tuple!($x);
-    };
-    ($($x:tt),+) => {
-        impl_tuple!($($x),*);
-        reverse_and_remove_last!([$($x),+]);
-    };
-}
-
-impl_tuples!(
-    (A: O1: 0), (B: O2: 1), (C: O3: 2), (D: O4: 3), (E: O5: 4), (F: O6: 5), (G: O7: 6), (H: O8: 7), (I: O9: 8), (J: O10: 9), (K: O11: 10), (L: O12: 11), (M: O13: 12), (N: O14: 13), (O: O15: 14), (P: O16: 15)
-);
 
 #[derive(Error, Debug)]
 pub enum MoreThanOneError {
@@ -497,7 +445,7 @@ pub fn map<'a, O, O2, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{create_span, tokenize};
+    use crate::{create_span, tokenize};
 
     #[test]
     fn test_take_n() {

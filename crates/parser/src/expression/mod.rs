@@ -5,13 +5,7 @@ mod operation;
 mod stringify;
 mod variable;
 
-use nom::{
-    branch::alt,
-    character::complete::char,
-    combinator::map,
-    sequence::{delimited, tuple},
-    IResult,
-};
+
 
 use crate::utils::Span;
 

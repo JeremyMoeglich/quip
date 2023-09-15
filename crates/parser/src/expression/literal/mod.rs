@@ -1,11 +1,8 @@
+use lexer::Token;
+use parser_core::*;
 use thiserror::Error;
 
-use crate::{
-    ast::Literal,
-    combine_errors,
-    core::{ParserResult, Span, TakeParserError},
-    lexer::Token,
-};
+use ast::Literal;
 
 #[derive(Debug, Error)]
 pub enum SubParseLiteralError {

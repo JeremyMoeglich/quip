@@ -5,7 +5,7 @@ use std::{
 
 use num::bigint::BigInt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Location {
     pub line: usize,
     pub column: usize,
