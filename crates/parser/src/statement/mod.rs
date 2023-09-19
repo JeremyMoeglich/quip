@@ -21,13 +21,13 @@ use self::{
 use super::{
     block::parse_block,
     expression::parse_expression,
-    utils::{ws, Span},
+    utils::{ws0, Span},
 };
 
 pub fn parse_statement(input: Span) -> IResult<Span, Statement> {
     map(
         tuple((
-            ws,
+            ws0,
             alt((
                 parse_function,
                 parse_if_statement,
@@ -42,7 +42,7 @@ pub fn parse_statement(input: Span) -> IResult<Span, Statement> {
                     Statement::Expression(expression)
                 }),
             )),
-            ws,
+            ws0,
             opt(char(';')),
         )),
         |(_, statement, _, semicolon)| match semicolon {

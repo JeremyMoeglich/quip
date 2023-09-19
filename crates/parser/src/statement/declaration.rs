@@ -5,7 +5,7 @@ use crate::{
     expression::parse_expression,
     identifier::parse_identifier,
     type_expression::parse_type_expression,
-    utils::{ws, ws1, Span},
+    utils::{ws0, ws1, Span},
 };
 
 pub fn parse_declaration(input: Span) -> IResult<Span, Statement> {
@@ -17,15 +17,15 @@ pub fn parse_declaration(input: Span) -> IResult<Span, Statement> {
     })(input)?;
     let (input, identifier) = parse_identifier(input)?;
     let (input, type_) = map(
-        opt(tuple((ws, char(':'), ws, parse_type_expression))),
+        opt(tuple((ws0, char(':'), ws0, parse_type_expression))),
         |v| match v {
             Some((_, _, _, type_)) => type_,
             None => TypeExpression::Infer,
         },
     )(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     let (input, expression_opt) =
-        map(opt(tuple((char('='), ws, parse_expression))), |v| match v {
+        map(opt(tuple((char('='), ws0, parse_expression))), |v| match v {
             Some((_, _, expression)) => Some(expression),
             None => None,
         })(input)?;

@@ -12,7 +12,7 @@ pub enum SubParseLiteralError {
 
 combine_errors!(pub ParseLiteralError, SubParseLiteralError, TakeParserError);
 
-pub fn parse_literal<'a>(input: Span<'a>) -> ParserResult<'a, Literal, ParseLiteralError> {
+pub fn parse_literal<'a>(input: &Span<'a>) -> ParserResult<'a, Literal, ParseLiteralError> {
     let (input, token) = input.take_token()?;
     match token.token {
         Token::RawString(string) => Ok((input, Literal::String(string.to_string()))),

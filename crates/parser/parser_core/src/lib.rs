@@ -198,7 +198,7 @@ pub fn take_while<'a, F: Fn(&LocatedToken<'a>) -> bool>(
     }
 }
 
-pub fn many0<'a, O, E: Clone>(
+pub fn many0<'a, O, E>(
     parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
     move |input: &Span<'a>| {
@@ -217,7 +217,7 @@ pub fn many0<'a, O, E: Clone>(
     }
 }
 
-pub fn many1<'a, O, E: Clone>(
+pub fn many1<'a, O, E>(
     parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
     move |input: &Span<'a>| {
@@ -339,22 +339,6 @@ pub enum TokenParserSubError {
     WrongTokenKind,
 }
 
-combine_errors!(pub TokenParserError, TakeParserError, TokenParserSubError);
-
-pub fn token<'a>(
-    token_kind: TokenKind,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, &'a LocatedToken<'a>, TokenParserError> {
-    move |input: &Span<'a>| {
-        let (input, first_span) = input.take_n_token(1)?;
-        let first = &first_span.tokens[0];
-        if first.kind() == token_kind {
-            Ok((input, first))
-        } else {
-            Err(TokenParserSubError::WrongTokenKind.into())
-        }
-    }
-}
-
 #[macro_export]
 macro_rules! extract_token_data {
     ($located_token:expr, $token_kind:ident) => {
@@ -433,15 +417,45 @@ pub fn more_than_one<
     }
 }
 
-pub fn map<'a, O, O2, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>>(
-    parser: P,
-    wrapper: impl Fn(O) -> O2,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E> {
-    move |span: &Span<'a>| {
-        let (input, output) = parser(span)?;
-        Ok((input, wrapper(output)))
+combine_errors!(pub TokenParserError, TakeParserError, TokenParserSubError);
+
+pub fn token<'a>(
+    token_kind: TokenKind,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, &'a LocatedToken<'a>, TokenParserError> {
+    move |input: &Span<'a>| {
+        let (input, first_span) = input.take_n_token(1)?;
+        let first = &first_span.tokens[0];
+        if first.kind() == token_kind {
+            Ok((input, first))
+        } else {
+            Err(TokenParserSubError::WrongTokenKind.into())
+        }
     }
 }
+
+pub trait Map<'a, O, E> {
+    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E>;
+    fn map_err<E2, F: Fn(E) -> E2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E2>;
+}
+
+impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> Map<'a, O, E> for P {
+    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E> {
+        move |span: &Span<'a>| {
+            let (input, output) = self(span)?;
+            Ok((input, wrapper(output)))
+        }
+    }
+    fn map_err<E2, F: Fn(E) -> E2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E2> {
+        move |span: &Span<'a>| {
+            let result = self(span);
+            match result {
+                Ok((input, output)) => Ok((input, output)),
+                Err(e) => Err(wrapper(e)),
+            }
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

@@ -129,7 +129,7 @@ pub enum Token<'a> {
 
     // Whitespace
     #[regex(r"( |\n|\t)*")]
-    Space,
+    Space(&'a str),
 
     Error,
 }

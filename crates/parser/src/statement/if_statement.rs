@@ -4,14 +4,14 @@ use crate::{
     ast::{CodeBlock, Expression, Statement},
     block::parse_block,
     expression::parse_expression,
-    utils::{ws, ws1, Span},
+    utils::{ws0, ws1, Span},
 };
 
 fn parse_if_block(input: Span) -> IResult<Span, (Expression, CodeBlock)> {
     let (input, _) = tag("if")(input)?;
     let (input, _) = ws1(input)?;
     let (input, condition) = parse_expression(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     let (input, code) = parse_block(input)?;
     Ok((input, (condition, code)))
 }
@@ -19,9 +19,9 @@ fn parse_if_block(input: Span) -> IResult<Span, (Expression, CodeBlock)> {
 pub fn parse_if_statement(input: Span) -> IResult<Span, Statement> {
     let (input, first_block) = parse_if_block(input)?;
     let (input, else_if_blocks) =
-        many0(map(tuple((ws, tag("else"), ws1, parse_if_block)), |e| e.3))(input)?;
+        many0(map(tuple((ws0, tag("else"), ws1, parse_if_block)), |e| e.3))(input)?;
     let (input, else_block) = map(
-        opt(tuple((ws, tag("else"), ws1, parse_block))),
+        opt(tuple((ws0, tag("else"), ws1, parse_block))),
         |v| match v {
             Some((_, _, _, block)) => Some(block),
             None => None,

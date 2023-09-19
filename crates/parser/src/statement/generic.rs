@@ -4,13 +4,13 @@ use crate::{
     ast::TypeExpression,
     identifier::parse_identifier,
     type_expression::parse_type_expression,
-    utils::{ws, ws_delimited, Span},
+    utils::{ws0, ws_delimited, Span},
 };
 
 fn parse_single_generic(input: Span) -> IResult<Span, (String, TypeExpression)> {
     let (input, name) = parse_identifier(input)?;
     let (input, type_) = map(
-        opt(tuple((ws, char(':'), ws, parse_type_expression))),
+        opt(tuple((ws0, char(':'), ws0, parse_type_expression))),
         |v| match v {
             Some((_, _, _, type_)) => type_,
             None => TypeExpression::Infer,

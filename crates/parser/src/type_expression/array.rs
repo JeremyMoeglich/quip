@@ -1,6 +1,6 @@
 
 use crate::{
-    utils::{ws, Span},
+    utils::{ws0, Span},
 };
 
 pub fn parse_type_array<'a, F>(
@@ -11,7 +11,7 @@ where
 {
     move |input| {
         let (mut input, mut expression) = start_parser(input)?;
-        while let Ok((new_input, _)) = tuple((ws, char('['), ws, char(']'), ws))(input) {
+        while let Ok((new_input, _)) = tuple((ws0, char('['), ws0, char(']'), ws0))(input) {
             input = new_input;
             expression = TypeExpression::Array(Box::new(expression));
         }

@@ -5,9 +5,8 @@ mod operation;
 mod stringify;
 mod variable;
 
-
-
-use crate::utils::Span;
+use ast::Expression;
+use parser_core::*;
 
 use self::{
     list::parse_list, literal::parse_literal, object::parse_object, operation::parse_operation,
@@ -15,35 +14,45 @@ use self::{
 };
 
 use super::{
-    ast::Expression,
     parse_code,
-    utils::{acond, ws},
+    utils::{acond, ws0, AcondError},
 };
 
-pub fn parse_expression(input: Span) -> IResult<Span, Expression> {
+use thiserror::Error;
+
+use parser_core::*;
+
+
+
+pub fn parse_expression<'a>(
+    input: &Span<'a>,
+) -> ParserResult<'a, Expression, ExpressionParseError> {
     parse_expression_with_rule(ExpressionParseRules::default())(input)
 }
 
 pub fn parse_expression_with_rule(
     rules: ExpressionParseRules,
-) -> impl Fn(Span) -> IResult<Span, Expression> {
-    move |input: Span| {
-        let (input, expression) = alt((
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, ExpressionParseError> {
+    move |input: &Span| {
+        let (input, expression) = (
             acond(rules.allow_operation, parse_operation(rules.clone())),
             parse_list,
             delimited(
-                tuple((char('('), ws)),
+                (token_parser!(nodata LeftParen), ws0).tuple(),
                 parse_expression,
-                tuple((ws, char(')'))),
+                (ws0, token_parser!(nodata RightParen)).tuple(),
             ),
             parse_object,
-            map(
-                delimited(tuple((char('{'), ws)), parse_code, tuple((ws, char('}')))),
-                |code| Expression::Block(code),
-            ),
-            map(parse_literal, |literal| Expression::Literal(literal)),
+            delimited(
+                (token_parser!(nodata LeftBrace), ws0).tuple(),
+                parse_code,
+                (ws0, token_parser!(nodata RightBrace)).tuple(),
+            )
+            .map(|code| Expression::Block(code)),
+            parse_literal.map(|literal| Expression::Literal(literal)),
             parse_variable,
-        ))(input)?;
+        )
+            .alt()(input)?;
         Ok((input, expression))
     }
 }
@@ -77,10 +86,6 @@ impl ExpressionParseRules {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ast::{Expression, FancyStringFragment, Operator},
-        utils::new_span,
-    };
     use pretty_assertions::assert_eq;
 
     use super::*;

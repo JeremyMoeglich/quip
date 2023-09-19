@@ -3,13 +3,13 @@
 use crate::{
     ast::TypeExpression,
     identifier::parse_identifier,
-    utils::{ws, ws_delimited, Span},
+    utils::{ws0, ws_delimited, Span},
 };
 
 use super::parse_type_expression;
 
 pub fn parse_type_object(input: Span) -> IResult<Span, TypeExpression> {
-    let (input, _) = tuple((ws, char('{'), ws))(input)?;
+    let (input, _) = tuple((ws0, char('{'), ws0))(input)?;
     let (input, parameters) = separated_list0(
         ws_delimited(char(',')),
         tuple((
@@ -18,7 +18,7 @@ pub fn parse_type_object(input: Span) -> IResult<Span, TypeExpression> {
             parse_type_expression,
         )),
     )(input)?;
-    let (input, _) = tuple((ws, char('}'), ws))(input)?;
+    let (input, _) = tuple((ws0, char('}'), ws0))(input)?;
     Ok((
         input,
         TypeExpression::Object(

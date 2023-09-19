@@ -18,12 +18,12 @@ use self::{
     ast::CodeBlock,
     error::{create_fancy_error, create_fancy_error_span},
     statement::parse_statement,
-    utils::{new_span, ws},
+    utils::{new_span, ws0},
 };
 
 pub fn parse_code(input: Span) -> IResult<Span, CodeBlock> {
     let (input, out) = many0(parse_statement)(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     Ok((input, out))
 }
 

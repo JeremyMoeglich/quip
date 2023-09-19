@@ -1,11 +1,9 @@
+use ast::*;
 use lazy_static::lazy_static;
+use lexer::TokenKind;
 
-use crate::{
-    ast::{Expression, Literal, Number, Operator, SingleOperation},
-    core::{LocatedToken, Span, ParserResult},
-    lexer::{Token, TokenKind},
-    utils::{vec_alt, ws},
-};
+use crate::utils::{vec_alt, ws0, VecAltError};
+use parser_core::*;
 
 use super::{parse_expression, parse_expression_with_rule, ExpressionParseRules};
 
@@ -25,8 +23,8 @@ struct OrderedOperator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct OrderedSingleOperator<'a> {
-    token: Token<'a>,
+struct OrderedSingleOperator {
+    token: TokenKind,
     operator: SingleOperation,
     priority: u8,
     side: Direction,
@@ -156,37 +154,37 @@ const OPERATORS: [OrderedOperator; 16] = [
 
 const SINGLE_OPERATORS: [OrderedSingleOperator; 6] = [
     OrderedSingleOperator {
-        token: Token::Exclamation,
+        token: TokenKind::Exclamation,
         operator: SingleOperation::Not,
         priority: 8,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        token: Token::Minus,
+        token: TokenKind::Minus,
         operator: SingleOperation::Negate,
         priority: 4,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        token: Token::Plus,
+        token: TokenKind::Plus,
         operator: SingleOperation::Positive,
         priority: 4,
         side: Direction::Left,
     },
     OrderedSingleOperator {
-        token: Token::Question,
+        token: TokenKind::Question,
         operator: SingleOperation::ErrorUnwrap,
         priority: 9,
         side: Direction::Right,
     },
     OrderedSingleOperator {
-        token: Token::Exclamation,
+        token: TokenKind::Exclamation,
         operator: SingleOperation::Panic,
         priority: 9,
         side: Direction::Right,
     },
     OrderedSingleOperator {
-        token: Token::Star,
+        token: TokenKind::Star,
         operator: SingleOperation::Spread,
         priority: 7,
         side: Direction::Left,
@@ -203,13 +201,13 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum SingleOperatorData<'a> {
-    Standalone(&'a OrderedSingleOperator<'a>),
+enum SingleOperatorData {
+    Standalone(OrderedSingleOperator),
     Call(Vec<Expression>),
     Get(Expression),
 }
 
-impl<'a> SingleOperatorData<'a> {
+impl SingleOperatorData {
     fn priority(&self) -> u8 {
         match self {
             SingleOperatorData::Standalone(operator) => operator.priority,
@@ -228,13 +226,13 @@ impl<'a> SingleOperatorData<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Segment<'a> {
+struct Segment {
     expression: Expression,
-    left_operations: Vec<SingleOperatorData<'a>>,
-    right_operations: Vec<SingleOperatorData<'a>>,
+    left_operations: Vec<SingleOperatorData>,
+    right_operations: Vec<SingleOperatorData>,
 }
 
-impl<'a> Segment<'a> {
+impl Segment {
     fn new(
         expression: Expression,
         left_operations: Vec<SingleOperatorData>,
@@ -389,66 +387,70 @@ impl<'a> Segment<'a> {
     }
 }
 
-fn parse_single_operator(side: Direction) -> impl Fn(Span) -> ParserResult<SingleOperatorData, String> {
+combine_errors!(pub SingleOperatorError, VecAltError, TakeParserError);
+
+fn parse_single_operator(
+    side: Direction,
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, SingleOperatorData, SingleOperatorError> {
     // Parse a single operator
     // Example: !, -, +, etc
     // This also includes function calls and array / object indexing (on the right side)
 
-    move |input: Span| {
+    move |input: &Span| {
         let mut single_parser = vec_alt(
             SINGLE_OPERATORS
                 .iter()
                 .filter(|o| o.side == side)
                 .map(|o| {
-                    Box::new(map(tag(o.string), move |_| {
-                        SingleOperatorData::Standalone(o)
-                    }))
+                    Box::new(token(o.token).map(move |_| SingleOperatorData::Standalone(o.clone())))
                 })
                 .collect::<Vec<_>>(),
         );
 
         let (input, operator) = match side {
-            Direction::Left => single_parser(input),
-            Direction::Right => alt((
+            Direction::Left => single_parser(&input),
+            Direction::Right => (
                 single_parser,
-                map(
-                    delimited(
-                        tuple((char('('), ws)),
-                        separated_list0(tuple((ws, char(','), ws)), parse_expression),
-                        tuple((ws, char(')'))),
-                    ),
-                    |o| SingleOperatorData::Call(o),
-                ),
-                map(
-                    delimited(
-                        tuple((char('['), ws)),
+                delimited(
+                    (token_parser!(nodata LeftParen), ws0).tuple(),
+                    separated_list0(
+                        (ws0, token_parser!(nodata Comma), ws0).tuple(),
                         parse_expression,
-                        tuple((ws, char(']'))),
                     ),
-                    |o| SingleOperatorData::Get(o),
-                ),
-            ))(input),
+                    (ws0, token_parser!(nodata RightParen)).tuple(),
+                )
+                .map(|o| SingleOperatorData::Call(o)),
+                delimited(
+                    (token_parser!(nodata LeftBracket), ws0).tuple(),
+                    parse_expression,
+                    (ws0, token_parser!(nodata RightBracket)).tuple(),
+                )
+                .map(|o| SingleOperatorData::Get(o)),
+            )
+                .alt()(&input),
         }?;
-        let (input, _) = ws(input)?;
+        let (input, _) = ws0(&input)?;
 
         Ok((input, operator))
     }
 }
 
-fn parse_segment(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<Span, Segment> {
-    move |input: Span| {
-        let mut input = input;
+fn parse_segment(
+    rules: ExpressionParseRules,
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Segment, TakeParserError> {
+    move |input: &Span| {
+        let mut input = input.clone();
         let mut left_side_operators = Vec::new();
         let left_side_single_operator = parse_single_operator(Direction::Left);
-        while let Ok((new_input, operator)) = left_side_single_operator(input) {
+        while let Ok((new_input, operator)) = left_side_single_operator(&input) {
             left_side_operators.push(operator);
             input = new_input;
         }
-        let (input, expr) = parse_expression_with_rule(rules.with_operation(false))(input)?;
-        let (mut input, _) = ws(input)?;
+        let (input, expr) = parse_expression_with_rule(rules.with_operation(false))(&input)?;
+        let (mut input, _) = ws0(&input)?;
         let mut right_side_operators = Vec::new();
         let right_side_single_operator = parse_single_operator(Direction::Right);
-        while let Ok((new_input, operator)) = right_side_single_operator(input) {
+        while let Ok((new_input, operator)) = right_side_single_operator(&input) {
             right_side_operators.push(operator);
             input = new_input;
         }
@@ -456,7 +458,7 @@ fn parse_segment(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<Span, 
         // reverse the order of the left side operators, so they are in the correct order (inside out)
         left_side_operators.reverse();
 
-        let (input, _) = ws(input)?;
+        let (input, _) = ws0(&input)?;
 
         let segment = Segment::new(expr, left_side_operators, right_side_operators);
 
@@ -464,51 +466,50 @@ fn parse_segment(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<Span, 
     }
 }
 
-fn parse_operator(input: Span) -> IResult<Span, OrderedOperator> {
+fn parse_operator<'a>(input: &Span<'a>) -> ParserResult<'a, OrderedOperator, TokenParserError> {
     for operator in OPERATORS_BY_LENGTH.iter() {
-        if let Ok((input, _)) = tag::<_, _, nom::error::Error<Span>>(operator.string)(input) {
+        if let Ok((input, _)) = token(operator.token)(input) {
             return Ok((input, (*operator).clone()));
         }
     }
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::IsNot,
-    )))
+    Err(TokenParserSubError::WrongTokenKind.into())
 }
 
-fn parse_operator_and_segment(input: Span) -> IResult<Span, (OrderedOperator, Segment)> {
-    let (input, _) = ws(input)?;
-    let (input, operator) = parse_operator(input)?;
-    let (input, _) = ws(input)?;
+fn parse_operator_and_segment<'a>(
+    input: &Span<'a>,
+) -> ParserResult<'a, (OrderedOperator, Segment), TokenParserError> {
+    let (input, _) = ws0(input)?;
+    let (input, operator) = parse_operator(&input)?;
+    let (input, _) = ws0(&input)?;
     // allow calls if operator has a higher priority than the call operator
     let call_priority = 9;
     let used_rules = match operator.priority {
         p if p < call_priority => ExpressionParseRules::default(),
         _ => ExpressionParseRules::default().with_call(false),
     };
-    let (input, segment) = parse_segment(used_rules)(input)?;
+    let (input, segment) = parse_segment(used_rules)(&input)?;
     Ok((input, (operator, segment)))
 }
 
-pub fn parse_operation(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<Span, Expression> {
-    move |input: Span| {
+pub fn parse_operation(
+    rules: ExpressionParseRules,
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, TokenParserError> {
+    move |input: &Span| {
         let (input, mut left_side) = parse_segment(rules)(input)?;
         let (mut input, (mut operator, mut right_side)) =
-            match parse_operator_and_segment(input.clone()) {
+            match parse_operator_and_segment(&input.clone()) {
                 Ok((input, (operator, right_side))) => Ok((input, (operator, right_side))),
-                Err(_) => {
+                Err(e) => {
                     if left_side.has_operations() {
                         return Ok((input, left_side.to_expression()));
                     } else {
-                        return Err(nom::Err::Error(nom::error::Error::new(
-                            input,
-                            nom::error::ErrorKind::IsNot,
-                        )));
+                        Err(e)
                     }
                 }
             }?;
 
-        while let Ok((input2, (next_operator, next_expression))) = parse_operator_and_segment(input)
+        while let Ok((input2, (next_operator, next_expression))) =
+            parse_operator_and_segment(&input)
         {
             if next_operator.priority > operator.priority
                 || next_operator.direction == Direction::Left
@@ -534,7 +535,7 @@ pub fn parse_operation(rules: ExpressionParseRules) -> impl Fn(Span) -> IResult<
 
 #[cfg(test)]
 mod tests {
-    use crate::{expression::parse_expression, utils::new_span};
+    use crate::{expression::parse_expression, utils::static_span};
     use num::BigInt;
     use pretty_assertions::assert_eq;
 
@@ -545,66 +546,70 @@ mod tests {
         let tests = vec![
             (
                 "-5 ** 2",
-                parse_expression(new_span("-(5 ** 2)")).unwrap().1,
+                parse_expression(&static_span("-(5 ** 2)")).unwrap().1,
             ),
             (
                 "!test.field",
-                parse_expression(new_span("!(test.field)")).unwrap().1,
+                parse_expression(&static_span("!(test.field)")).unwrap().1,
             ),
             (
                 "-5 == 2",
-                parse_expression(new_span("(-5) == (2)")).unwrap().1,
+                parse_expression(&static_span("(-5) == (2)")).unwrap().1,
             ),
             (
                 "-!5 ** 6",
-                parse_expression(new_span("-((!5) ** 6)")).unwrap().1,
+                parse_expression(&static_span("-((!5) ** 6)")).unwrap().1,
             ),
             (
                 "5 ** 2 ** 3",
-                parse_expression(new_span("5 ** (2 ** 3)")).unwrap().1,
+                parse_expression(&static_span("5 ** (2 ** 3)")).unwrap().1,
             ),
             (
                 "5 ** 2 * 3",
-                parse_expression(new_span("(5 ** 2) * 3")).unwrap().1,
+                parse_expression(&static_span("(5 ** 2) * 3")).unwrap().1,
             ),
             (
                 "5 * 2 ** 3",
-                parse_expression(new_span("5 * (2 ** 3)")).unwrap().1,
+                parse_expression(&static_span("5 * (2 ** 3)")).unwrap().1,
             ),
             (
                 "5 * 2 * 3",
-                parse_expression(new_span("(5 * 2) * 3")).unwrap().1,
+                parse_expression(&static_span("(5 * 2) * 3")).unwrap().1,
             ),
             (
                 "5 + 2 * 3",
-                parse_expression(new_span("5 + (2 * 3)")).unwrap().1,
+                parse_expression(&static_span("5 + (2 * 3)")).unwrap().1,
             ),
             (
                 "5 * 2 + 3",
-                parse_expression(new_span("(5 * 2) + 3")).unwrap().1,
+                parse_expression(&static_span("(5 * 2) + 3")).unwrap().1,
             ),
             (
                 "5 + 2 + 3",
-                parse_expression(new_span("(5 + 2) + 3")).unwrap().1,
+                parse_expression(&static_span("(5 + 2) + 3")).unwrap().1,
             ),
             (
                 "5 + 2 - 3",
-                parse_expression(new_span("(5 + 2) - 3")).unwrap().1,
+                parse_expression(&static_span("(5 + 2) - 3")).unwrap().1,
             ),
             (
                 "3 + 4",
                 Expression::Operation(
-                    Box::new(Expression::Literal(Literal::Integer(BigInt::from(3)))),
+                    Box::new(Expression::Literal(Literal::Number(Number::Integer(
+                        BigInt::from(3),
+                    )))),
                     Operator::Add,
-                    Box::new(Expression::Literal(Literal::Integer(BigInt::from(4)))),
+                    Box::new(Expression::Literal(Literal::Number(Number::Integer(
+                        BigInt::from(4),
+                    )))),
                 ),
             ),
         ];
 
         for (input, expected) in tests {
             let (input, result) =
-                parse_operation(ExpressionParseRules::default())(new_span(input)).unwrap();
-            assert_eq!(input.fragment(), &"");
+                parse_operation(ExpressionParseRules::default())(&static_span(input)).unwrap();
+            assert_eq!(input.tokens.len(), 0);
             assert_eq!(result, expected);
         }
     }

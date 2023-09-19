@@ -3,7 +3,7 @@
 use crate::{
     ast::Statement,
     identifier::parse_identifier,
-    utils::{ws, ws1, Span},
+    utils::{ws0, ws1, Span},
 };
 
 use super::parse_statement;
@@ -19,11 +19,11 @@ pub fn parse_impl(input: Span) -> IResult<Span, Statement> {
         },
     )(input)?;
     let (input, identifier) = parse_identifier(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     let (input, _) = char('{')(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     let (input, statements) = many0(parse_statement)(input)?;
-    let (input, _) = ws(input)?;
+    let (input, _) = ws0(input)?;
     let (input, _) = char('}')(input)?;
     Ok((input, Statement::Impl(identifier, trait_name, statements)))
 }
