@@ -22,35 +22,35 @@ use thiserror::Error;
 
 use parser_core::*;
 
-
-
-pub fn parse_expression<'a>(
-    input: &Span<'a>,
-) -> ParserResult<'a, Expression, ExpressionParseError> {
+pub fn parse_expression<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, ()> {
     parse_expression_with_rule(ExpressionParseRules::default())(input)
 }
 
 pub fn parse_expression_with_rule(
     rules: ExpressionParseRules,
-) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, ExpressionParseError> {
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, ()> {
     move |input: &Span| {
         let (input, expression) = (
-            acond(rules.allow_operation, parse_operation(rules.clone())),
-            parse_list,
+            acond(rules.allow_operation, parse_operation(rules.clone())).map_err(|_| ()),
+            parse_list.map_err(|_| ()),
             delimited(
                 (token_parser!(nodata LeftParen), ws0).tuple(),
                 parse_expression,
                 (ws0, token_parser!(nodata RightParen)).tuple(),
-            ),
-            parse_object,
+            )
+            .map_err(|_| ()),
+            parse_object.map_err(|_| ()),
             delimited(
                 (token_parser!(nodata LeftBrace), ws0).tuple(),
                 parse_code,
                 (ws0, token_parser!(nodata RightBrace)).tuple(),
             )
+            .map_err(|_| ())
             .map(|code| Expression::Block(code)),
-            parse_literal.map(|literal| Expression::Literal(literal)),
-            parse_variable,
+            parse_literal
+                .map(|literal| Expression::Literal(literal))
+                .map_err(|_| ()),
+            parse_variable.map_err(|_| ()),
         )
             .alt()(input)?;
         Ok((input, expression))
@@ -86,7 +86,10 @@ impl ExpressionParseRules {
 
 #[cfg(test)]
 mod tests {
+    use ast::{Operator, Literal};
     use pretty_assertions::assert_eq;
+
+    use crate::utils::static_span;
 
     use super::*;
 
@@ -95,19 +98,19 @@ mod tests {
         let tests = vec![
             (
                 r#""test""#,
-                Expression::FancyString(vec![FancyStringFragment::LiteralString(
+                Expression::FancyString(vec![Literal::String(
                     "test".to_string(),
                 )]),
             ),
             (
                 "obj!.field(5, 2)",
-                parse_expression(new_span("((obj!).field)(5, 2)"))
+                parse_expression(&static_span("((obj!).field)(5, 2)"))
                     .unwrap()
                     .1,
             ),
             (
                 r#"("5".to_int() + 5)"#,
-                parse_expression(new_span(r#"((("5").to_int)() + 5)"#))
+                parse_expression(&static_span(r#"((("5").to_int)() + 5)"#))
                     .unwrap()
                     .1,
             ),
@@ -115,7 +118,7 @@ mod tests {
                 r#""5".to_int()"#,
                 Expression::Call(
                     Box::new(Expression::Operation(
-                        Box::new(parse_expression(new_span(r#""5""#)).unwrap().1),
+                        Box::new(parse_expression(&static_span(r#""5""#)).unwrap().1),
                         Operator::Access,
                         Box::new(Expression::Variable("to_int".to_string())),
                     )),
@@ -125,7 +128,7 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            let (input, result) = parse_expression(new_span(input)).unwrap();
+            let (input, result) = parse_expression(&static_span(input)).unwrap();
             assert_eq!(input.fragment(), &"");
             assert_eq!(result, expected);
         }

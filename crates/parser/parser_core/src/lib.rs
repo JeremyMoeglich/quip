@@ -333,6 +333,25 @@ pub fn delimited<'a, O, O1_, O2_, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>
     }
 }
 
+pub fn preceded<'a, O1_, O, E: From<E1> + From<E2>, E1, E2>(
+    first: impl Fn(&Span<'a>) -> ParserResult<'a, O1_, E1>,
+    second: impl Fn(&Span<'a>) -> ParserResult<'a, O, E2>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
+    move |input: &Span<'a>| {
+        let mut input = input.clone();
+
+        // Run the first parser and discard its result
+        let (rest, _) = first(&input)?;
+        input = rest;
+
+        // Run the second parser and keep its result
+        let (rest, o) = second(&input)?;
+        input = rest;
+
+        Ok((input, o))
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum TokenParserSubError {
     #[error("The token was not the expected kind")]
@@ -433,12 +452,12 @@ pub fn token<'a>(
     }
 }
 
-pub trait Map<'a, O, E> {
+pub trait MapParser<'a, O, E> {
     fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E>;
     fn map_err<E2, F: Fn(E) -> E2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E2>;
 }
 
-impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> Map<'a, O, E> for P {
+impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> MapParser<'a, O, E> for P {
     fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E> {
         move |span: &Span<'a>| {
             let (input, output) = self(span)?;

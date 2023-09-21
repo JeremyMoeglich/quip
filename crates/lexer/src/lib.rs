@@ -92,6 +92,10 @@ pub enum Token<'a> {
     Assign,
     #[token("->")]
     ThinArrow,
+    #[token("|")]
+    VerticalBar,
+    #[token("&")]
+    Ampersand,
 
     // Keywords
     #[token("let")]

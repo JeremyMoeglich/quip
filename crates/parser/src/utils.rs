@@ -57,7 +57,7 @@ where
 
 pub fn ws_delimited<'a, O, F, E: From<TakeParserError>>(
     parser: F,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, (Whitespace, O, Whitespace), E>
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>
 where
     F: Fn(&Span<'a>) -> ParserResult<'a, O, E>,
 {
@@ -65,7 +65,7 @@ where
         let (input, whitespace_before) = ws0(input)?;
         let (input, value) = parser(&input)?;
         let (input, whitespace_after) = ws0(&input)?;
-        Ok((input, (whitespace_before, value, whitespace_after)))
+        Ok((input, value))
     }
 }
 

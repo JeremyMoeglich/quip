@@ -1,31 +1,32 @@
-
-
+use ast::TypeExpression;
+use parser_core::*;
 use crate::{
-    ast::TypeExpression,
     identifier::parse_identifier,
-    utils::{ws0, ws_delimited, Span},
+    type_expression::parse_type_expression,
+    utils::{opt, ws0, ws_delimited},
 };
 
-use super::parse_type_expression;
-
-pub fn parse_type_object(input: Span) -> IResult<Span, TypeExpression> {
-    let (input, _) = tuple((ws0, char('{'), ws0))(input)?;
+pub fn parse_type_object<'a>(input: &Span<'a>) -> ParserResult<'a, TypeExpression, TokenParserError> {
+    let (input, _) = (ws0, token_parser!(nodata LeftBrace), ws0).tuple()(input)?;
+    
     let (input, parameters) = separated_list0(
-        ws_delimited(char(',')),
-        tuple((
+        ws_delimited(token_parser!(nodata Comma)),
+        (
             parse_identifier,
-            ws_delimited(char(':')),
-            parse_type_expression,
-        )),
-    )(input)?;
-    let (input, _) = tuple((ws0, char('}'), ws0))(input)?;
+            ws_delimited(token_parser!(nodata Colon)),
+            parse_type_expression
+        ).tuple(),
+    )(&input)?;
+
+    let (input, _) = (ws0, token_parser!(nodata RightBrace), ws0).tuple()(&input)?;
+
     Ok((
         input,
         TypeExpression::Object(
             parameters
                 .iter()
                 .map(|(name, _, type_)| (name.clone(), type_.clone()))
-                .collect::<Vec<_>>(),
-        ),
+                .collect::<Vec<_>>()
+        )
     ))
 }

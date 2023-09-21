@@ -7,7 +7,7 @@ use super::parse_expression;
 
 pub fn parse_list<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, TakeParserError> {
     let (input, value) = delimited(
-        (token_parser!(nodata LeftBracket), ws0.map(|_| ())).tuple(),
+        (token_parser!(nodata LeftBracket), MapParser::map(ws0, |_| ())).tuple(),
         separated_list0(
             (ws0, token_parser!(nodata Comma), ws0).tuple(),
             parse_expression,

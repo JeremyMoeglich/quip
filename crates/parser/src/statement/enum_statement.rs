@@ -1,41 +1,49 @@
-
+use ast::Statement;
+use parser_core::*;
 
 use crate::{
-    ast::Statement,
     identifier::parse_identifier,
     type_expression::parse_type_expression,
-    utils::{ws0, ws1, ws_delimited, Span},
+    utils::{opt, ws0, ws1, ws_delimited},
 };
 
 use super::generic::parse_generics;
 
-pub fn parse_enum(input: Span) -> IResult<Span, Statement> {
-    let (input, _) = tag("enum")(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, name) = parse_identifier(input)?;
-    let (input, _) = ws0(input)?;
-    let (input, generics) = parse_generics(input)?;
-    let (input, _) = ws0(input)?;
+pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, TokenParserError> {
+    let (input, _) = token_parser!(nodata Enum)(input)?;
+    let (input, _) = ws1(&input)?;
+    let (input, name) = parse_identifier(&input)?;
+    let (input, _) = ws0(&input)?;
+    let (input, generics) = parse_generics(&input)?;
+    let (input, _) = ws0(&input)?;
     let (input, options) = delimited(
-        tuple((char('{'), ws0)),
+        (token_parser!(nodata LeftBrace), ws0).tuple(),
         separated_list0(
-            tuple((ws0, char(','), ws0)),
-            tuple((
+            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            (
                 parse_identifier,
-                map(
-                    opt(delimited(
-                        ws_delimited(char('(')),
-                        separated_list0(ws_delimited(char(',')), parse_type_expression),
-                        ws_delimited(char(')')),
-                    )),
-                    |v| match v {
-                        Some(type_) => type_,
-                        None => vec![],
-                    },
-                ),
-            )),
+                opt(delimited(
+                    ws_delimited(token_parser!(nodata LeftParen)),
+                    separated_list0(
+                        ws_delimited(token_parser!(nodata Comma)),
+                        parse_type_expression,
+                    ),
+                    ws_delimited(token_parser!(nodata RightParen)),
+                ))
+                .map(|v| match v {
+                    Some(type_) => type_,
+                    None => vec![],
+                }),
+            )
+                .tuple(),
         ),
-        tuple((ws0, opt(char(',')), ws0, char('}'))),
+        (
+            ws0,
+            opt(token_parser!(nodata Comma)),
+            ws0,
+            token_parser!(nodata RightBrace),
+        )
+            .tuple(),
     )(input)?;
     Ok((input, Statement::Enum(name, generics, options)))
 }
