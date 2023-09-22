@@ -1,5 +1,4 @@
 use ast::*;
-use lazy_static::lazy_static;
 use lexer::TokenKind;
 
 use crate::utils::{vec_alt, ws0, VecAltError};
@@ -190,15 +189,6 @@ const SINGLE_OPERATORS: [OrderedSingleOperator; 6] = [
         side: Direction::Left,
     },
 ];
-
-lazy_static! {
-    // Sort the operators by length, so that we can parse the longest operators first
-    static ref OPERATORS_BY_LENGTH: Vec<&'static OrderedOperator> = {
-        let mut operators: Vec<_> = OPERATORS.iter().collect();
-        operators.sort_by(|a, b| b.token.len().cmp(&a.token.len()));
-        operators
-    };
-}
 
 #[derive(Debug, Clone, PartialEq)]
 enum SingleOperatorData {
@@ -467,7 +457,7 @@ fn parse_segment(
 }
 
 fn parse_operator<'a>(input: &Span<'a>) -> ParserResult<'a, OrderedOperator, TokenParserError> {
-    for operator in OPERATORS_BY_LENGTH.iter() {
+    for operator in OPERATORS.iter() {
         if let Ok((input, _)) = token(operator.token)(input) {
             return Ok((input, (*operator).clone()));
         }

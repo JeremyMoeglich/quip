@@ -4,7 +4,7 @@ use ast::Location;
 use lexer::{Token, TokenKind};
 mod error_union;
 use logos::Logos;
-use parser_proc::{generate_all_tuple_impls, generate_all_alt_impls};
+use parser_proc::{generate_all_alt_impls, generate_all_tuple_impls};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -60,14 +60,12 @@ pub fn tokenize<'a>(source: &'a str) -> Vec<LocatedToken<'a>> {
 }
 
 pub fn create_span<'a>(tokens: &'a [LocatedToken<'a>]) -> Span<'a> {
-    Span {
-        start: Location {
-            column: 0,
-            line: 0,
-            index: 0,
-        },
-        tokens,
-    }
+    let start = Location {
+        column: 0,
+        line: 0,
+        index: 0,
+    };
+    Span { start, tokens }
 }
 
 #[derive(Error, Debug)]
@@ -114,16 +112,56 @@ impl TokensLength for Span<'_> {
     }
 }
 
-pub type ParserResult<'a, O, E> = Result<(Span<'a>, O), E>;
+#[derive(Error, Debug)]
+enum ParserError {
+    #[error("Unexpected token {0:?}, expected one of {1:?}")]
+    UnexpectedToken(TokenKind, Vec<TokenKind>), // Got, Expected
+    #[error("Unexpected end of input")]
+    EndOfInput,
+    #[error("Parser inactive")]
+    InactiveParser,
+}
+impl ParserError {
+    fn locate(self, location: Location) -> LocatedParserError {
+        LocatedParserError::new(self, location)
+    }
+}
 
-impl<'a> Span<'a> {
-    pub fn new(code: &'a [LocatedToken], location: Location) -> Self {
+#[derive(Error, Debug)]
+#[error("{error} at {location}")]
+pub struct LocatedParserError {
+    pub error: ParserError,
+    pub location: Location,
+}
+
+impl LocatedParserError {
+    fn new(error: ParserError, location: Location) -> Self {
+        LocatedParserError { error, location }
+    }
+    fn map_error<F: Fn(ParserError) -> ParserError>(self, wrapper: F) -> Self {
         Self {
-            tokens: code,
-            start: location,
+            error: wrapper(self.error),
+            location: self.location,
         }
     }
-    pub fn take_n_token(&self, n: usize) -> ParserResult<'a, Span<'a>, TakeParserError> {
+    fn map_location<F: Fn(Location) -> Location>(self, wrapper: F) -> Self {
+        Self {
+            error: self.error,
+            location: wrapper(self.location),
+        }
+    }
+}
+
+pub type ParserResult<'a, O> = Result<(Span<'a>, O), LocatedParserError>;
+
+impl<'a> Span<'a> {
+    pub fn new(code: &'a [LocatedToken], start: Location) -> Self {
+        Self {
+            tokens: code,
+            start,
+        }
+    }
+    pub fn take_n_token(&self, n: usize) -> ParserResult<'a, Span<'a>> {
         if n == 0 {
             return Ok((
                 Span {
@@ -137,7 +175,7 @@ impl<'a> Span<'a> {
             ));
         }
         if n > self.tokens.len() {
-            return Err(TakeParserError::EndOfInput);
+            return Err(LocatedParserError::new(ParserError::EndOfInput, self.end()));
         }
 
         let (chunk, rest) = self.tokens.split_at(n);
@@ -166,22 +204,44 @@ impl<'a> Span<'a> {
         Ok((rest_span, chunk_span))
     }
 
-    pub fn take_tokens<const N: usize>(
-        &self,
-    ) -> ParserResult<'a, &'a [LocatedToken<'a>; N], TakeParserError> {
+    pub fn take_tokens<const N: usize>(&self) -> ParserResult<'a, &'a [LocatedToken<'a>; N]> {
         let (rest, chunk) = self.take_n_token(N)?;
         let chunk = chunk.tokens;
         let chunk = chunk.try_into().unwrap(); // safe because chunk.len() == N due to take_n_token
         Ok((rest, chunk))
     }
-    pub fn take_token(&self) -> ParserResult<'a, LocatedToken<'a>, TakeParserError> {
+    pub fn take_token(&self) -> ParserResult<'a, LocatedToken<'a>> {
         let (rest, chunk) = self.take_tokens::<1>()?;
         Ok((rest, chunk[0].clone()))
     }
-    pub fn kind(&self) -> Result<TokenKind, TakeParserError> {
+    pub fn peek_first_kind(&self) -> Option<TokenKind> {
         match self.tokens.first() {
-            Some(token) => Ok(token.kind()),
-            None => Err(TakeParserError::EndOfInput),
+            Some(token) => Some(token.kind()),
+            None => None,
+        }
+    }
+    pub fn end(&self) -> Location {
+        match self.tokens.last() {
+            Some(token) => {
+                let index = token.start.index + token.text.len();
+                let line = token.start.line + token.text.lines().count() - 1;
+                let final_line = token.text.lines().last().unwrap_or("");
+                let column = if token.text.lines().count() == 1 {
+                    token.start.column + final_line.len()
+                } else {
+                    final_line.len()
+                };
+                Location {
+                    index,
+                    line,
+                    column,
+                }
+            }
+            None => Location {
+                index: 0,
+                line: 0,
+                column: 0,
+            },
         }
     }
 }
@@ -198,9 +258,9 @@ pub fn take_while<'a, F: Fn(&LocatedToken<'a>) -> bool>(
     }
 }
 
-pub fn many0<'a, O, E>(
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
+pub fn many0<'a, O>(
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
         let mut output = vec![];
@@ -217,9 +277,9 @@ pub fn many0<'a, O, E>(
     }
 }
 
-pub fn many1<'a, O, E>(
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
+pub fn many1<'a, O>(
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
         let mut output = vec![];
@@ -242,10 +302,10 @@ pub fn many1<'a, O, E>(
     }
 }
 
-pub fn separated_list0<'a, O, O_, E>(
-    separator: impl Fn(&Span<'a>) -> ParserResult<'a, O_, E>,
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
+pub fn separated_list0<'a, O, O_>(
+    separator: impl Fn(&Span<'a>) -> ParserResult<'a, O_>,
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
         let mut output = vec![];
@@ -272,9 +332,9 @@ pub fn separated_list0<'a, O, O_, E>(
 }
 
 pub fn separated_list1<'a, O, E>(
-    separator: impl Fn(&Span<'a>) -> ParserResult<'a, (), E>,
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
+    separator: impl Fn(&Span<'a>) -> ParserResult<'a, ()>,
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
         let mut output = vec![];
@@ -309,11 +369,11 @@ pub fn separated_list1<'a, O, E>(
     }
 }
 
-pub fn delimited<'a, O, O1_, O2_, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>(
-    start: impl Fn(&Span<'a>) -> ParserResult<'a, O1_, E1>,
-    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O, E3>,
-    end: impl Fn(&Span<'a>) -> ParserResult<'a, O2_, E2>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
+pub fn delimited<'a, O, O1_, O2_>(
+    start: impl Fn(&Span<'a>) -> ParserResult<'a, O1_>,
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+    end: impl Fn(&Span<'a>) -> ParserResult<'a, O2_>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
 
@@ -333,10 +393,10 @@ pub fn delimited<'a, O, O1_, O2_, E: From<E1> + From<E2> + From<E3>, E1, E2, E3>
     }
 }
 
-pub fn preceded<'a, O1_, O, E: From<E1> + From<E2>, E1, E2>(
-    first: impl Fn(&Span<'a>) -> ParserResult<'a, O1_, E1>,
-    second: impl Fn(&Span<'a>) -> ParserResult<'a, O, E2>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E> {
+pub fn preceded<'a, O1_, O>(
+    first: impl Fn(&Span<'a>) -> ParserResult<'a, O1_>,
+    second: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> {
     move |input: &Span<'a>| {
         let mut input = input.clone();
 
@@ -350,12 +410,6 @@ pub fn preceded<'a, O1_, O, E: From<E1> + From<E2>, E1, E2>(
 
         Ok((input, o))
     }
-}
-
-#[derive(Error, Debug)]
-pub enum TokenParserSubError {
-    #[error("The token was not the expected kind")]
-    WrongTokenKind,
 }
 
 #[macro_export]
@@ -400,81 +454,60 @@ macro_rules! token_parser {
     };
 }
 
-pub trait Alt<'a, O, E> {
-    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
+pub trait Alt<'a, O> {
+    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>;
 }
 
 generate_all_alt_impls!(16);
 
-pub trait Tuple<'a, O, E> {
-    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>;
+pub trait Tuple<'a, O> {
+    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>;
 }
 
 generate_all_tuple_impls!(16);
 
-
-#[derive(Error, Debug)]
-pub enum MoreThanOneError {
-    #[error("The parser returned 0 elements, expected at least 1")]
-    ZeroElements,
-}
-
-pub fn more_than_one<
-    'a,
-    O,
-    E: From<MoreThanOneError>,
-    P: Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E>,
->(
-    parser: P,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>, E> {
-    move |span: &Span<'a>| {
-        let (input, output) = parser(span)?;
-        if output.len() != 1 {
-            return Err(MoreThanOneError::ZeroElements.into());
-        }
-        Ok((input, output))
-    }
-}
-
-combine_errors!(pub TokenParserError, TakeParserError, TokenParserSubError);
-
 pub fn token<'a>(
     token_kind: TokenKind,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, &'a LocatedToken<'a>, TokenParserError> {
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, &'a LocatedToken<'a>> {
     move |input: &Span<'a>| {
         let (input, first_span) = input.take_n_token(1)?;
         let first = &first_span.tokens[0];
         if first.kind() == token_kind {
             Ok((input, first))
         } else {
-            Err(TokenParserSubError::WrongTokenKind.into())
+            Err(ParserError::UnexpectedToken(first.kind(), vec![token_kind]).locate())
         }
     }
 }
 
-pub trait MapParser<'a, O, E> {
-    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E>;
-    fn map_err<E2, F: Fn(E) -> E2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E2>;
+pub trait MapParser<'a, O> {
+    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2>;
+    fn map_err<F: Fn(ParserError) -> ParserError>(
+        self,
+        wrapper: F,
+    ) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>;
 }
 
-impl<'a, O, E, P: Fn(&Span<'a>) -> ParserResult<'a, O, E>> MapParser<'a, O, E> for P {
-    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2, E> {
+impl<'a, O, P: Fn(&Span<'a>) -> ParserResult<'a, O>> MapParser<'a, O> for P {
+    fn map<O2, F: Fn(O) -> O2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O2> {
         move |span: &Span<'a>| {
             let (input, output) = self(span)?;
             Ok((input, wrapper(output)))
         }
     }
-    fn map_err<E2, F: Fn(E) -> E2>(self, wrapper: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E2> {
+    fn map_err<F: Fn(ParserError) -> ParserError>(
+        self,
+        wrapper: F,
+    ) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> {
         move |span: &Span<'a>| {
             let result = self(span);
             match result {
                 Ok((input, output)) => Ok((input, output)),
-                Err(e) => Err(wrapper(e)),
+                Err(e) => Err(e.map_error(&wrapper)),
             }
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

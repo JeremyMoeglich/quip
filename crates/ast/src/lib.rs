@@ -12,6 +12,12 @@ pub struct Location {
     pub index: usize,
 }
 
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "line:{} - col:{}", self.line, self.column)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceLocation {
     pub start: Location,

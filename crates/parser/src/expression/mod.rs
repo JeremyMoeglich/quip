@@ -22,30 +22,31 @@ use thiserror::Error;
 
 use parser_core::*;
 
-pub fn parse_expression<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, ()> {
+pub fn parse_expression<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, TokenParserError> {
     parse_expression_with_rule(ExpressionParseRules::default())(input)
 }
 
 pub fn parse_expression_with_rule(
     rules: ExpressionParseRules,
-) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, ()> {
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, TokenParserError> {
     move |input: &Span| {
         let (input, expression) = (
-            acond(rules.allow_operation, parse_operation(rules.clone())).map_err(|_| ()),
-            parse_list.map_err(|_| ()),
+            acond(rules.allow_operation, parse_operation(rules.clone())).map_err(|e| match e {
+                AcondError::ParserError(e) => e,
+                AcondError::ParserInactive => TokenParserSubError::WrongTokenKind.into(),
+            }),
+            parse_list.map_err(|e| e.into()),
             delimited(
                 (token_parser!(nodata LeftParen), ws0).tuple(),
                 parse_expression,
                 (ws0, token_parser!(nodata RightParen)).tuple(),
-            )
-            .map_err(|_| ()),
-            parse_object.map_err(|_| ()),
+            ),
+            parse_object.map_err(|e| e.into()),
             delimited(
                 (token_parser!(nodata LeftBrace), ws0).tuple(),
                 parse_code,
                 (ws0, token_parser!(nodata RightBrace)).tuple(),
             )
-            .map_err(|_| ())
             .map(|code| Expression::Block(code)),
             parse_literal
                 .map(|literal| Expression::Literal(literal))
@@ -86,7 +87,7 @@ impl ExpressionParseRules {
 
 #[cfg(test)]
 mod tests {
-    use ast::{Operator, Literal};
+    use ast::{Literal, Operator};
     use pretty_assertions::assert_eq;
 
     use crate::utils::static_span;
@@ -98,9 +99,7 @@ mod tests {
         let tests = vec![
             (
                 r#""test""#,
-                Expression::FancyString(vec![Literal::String(
-                    "test".to_string(),
-                )]),
+                Expression::FancyString(vec![Literal::String("test".to_string())]),
             ),
             (
                 "obj!.field(5, 2)",

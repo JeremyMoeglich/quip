@@ -9,6 +9,8 @@ derivative = "2.2.0"
 enum-kinds = "0.5.1"
 lazy_static = "1.4.0"
 logos = "0.13.0"
+parser = { path = "crates/parser" }
+interpreter = { path = "crates/interpreter" }
 
 [workspace]
 members = [

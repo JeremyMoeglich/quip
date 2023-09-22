@@ -73,6 +73,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "interpreter"
+version = "0.1.0"
+dependencies = [
+ "num",
+ "pad",
+ "pretty_assertions",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -226,6 +235,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "parser"
+version = "0.1.0"
+dependencies = [
+ "ast",
+ "enum-kinds",
+ "lazy_static",
+ "lexer",
+ "logos",
+ "num",
+ "oom",
+ "pad",
+ "parser-core",
+ "pretty_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "parser-core"
 version = "0.1.0"
 dependencies = [
@@ -286,34 +312,10 @@ version = "0.1.0"
 dependencies = [
  "derivative",
  "enum-kinds",
+ "interpreter",
  "lazy_static",
  "logos",
-]
-
-[[package]]
-name = "quip-interpreter"
-version = "0.1.0"
-dependencies = [
- "num",
- "pad",
- "pretty_assertions",
-]
-
-[[package]]
-name = "quip-parser"
-version = "0.1.0"
-dependencies = [
- "ast",
- "enum-kinds",
- "lazy_static",
- "lexer",
- "logos",
- "num",
- "oom",
- "pad",
- "parser-core",
- "pretty_assertions",
- "thiserror",
+ "parser",
 ]
 
 [[package]]

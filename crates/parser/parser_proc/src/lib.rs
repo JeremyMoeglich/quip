@@ -25,8 +25,8 @@ pub fn generate_all_tuple_impls(input: TokenStream) -> TokenStream {
         let indices = (0..i).collect::<Vec<_>>();
 
         let tokens = quote! {
-            impl<'a, Err, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, #type_names, Err>),* , #(#type_names,)*> Tuple<'a, (#(#type_names,)*), Err> for (#(#fn_names,)*) {
-                fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, (#(#type_names,)*), Err> {
+            impl<'a, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, #type_names>),* , #(#type_names,)*> Tuple<'a, (#(#type_names,)*)> for (#(#fn_names,)*) {
+                fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, (#(#type_names,)*)> {
                     move |input: &Span<'a>| {
                         let mut input = input.clone();
                         #(
@@ -63,8 +63,8 @@ pub fn generate_all_alt_impls(input: TokenStream) -> TokenStream {
         let indices = (0..i).collect::<Vec<_>>();
 
         let tokens = quote! {
-            impl<'a, Out, Err, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, Out, Err>),*> Alt<'a, Out, Err> for (#(#fn_names,)*) {
-                fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out, Err> {
+            impl<'a, Out, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, Out>),*> Alt<'a, Out> for (#(#fn_names,)*) {
+                fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out> {
                     move |input: &Span<'a>| {
                         let mut err = None;
                         #(
