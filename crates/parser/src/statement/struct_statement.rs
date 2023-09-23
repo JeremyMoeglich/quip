@@ -10,12 +10,12 @@ use super::generic::parse_generics;
 
 pub fn parse_struct_block<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<TypedIdentifier>> {
     delimited(
-        (token_parser!(nodata LeftBrace), ws0).tuple(),
+        (parse_LeftBrace, ws0).tuple(),
         separated_list0(
-            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            (ws0, parse_Comma, ws0).tuple(),
             (
                 parse_identifier,
-                opt((ws0, token_parser!(nodata Colon), ws0, parse_expression).tuple()).map(|v| {
+                opt((ws0, parse_Colon, ws0, parse_expression).tuple()).map(|v| {
                     match v {
                         Some((_, _, _, type_)) => type_,
                         None => Expression::Infer,
@@ -30,15 +30,15 @@ pub fn parse_struct_block<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<TypedIde
         ),
         (
             ws0,
-            opt(token_parser!(nodata Comma)),
+            opt(parse_Comma),
             ws0,
-            token_parser!(nodata RightBrace),
+            parse_RightBrace,
         )
             .tuple(),
     )(input)
 }
 pub fn parse_struct<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
-    let (input, _) = token_parser!(nodata Struct)(input)?;
+    let (input, _) = parse_Struct(input)?;
     let (input, _) = ws1(&input)?;
     let (input, name) = parse_identifier(&input)?;
     let (input, _) = ws0(&input)?;

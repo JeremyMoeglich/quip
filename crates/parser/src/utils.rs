@@ -1,34 +1,32 @@
 #![allow(dead_code)]
 
 use ast::{Comment, Location};
-use lexer::Token;
 use parser_core::*;
-use thiserror::Error;
 
 // Utils for parsing
 
 pub fn ws1<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
     let (input, whitespace) = many1(
         (
-            token_parser!(data LineComment).map(|v| Some(Comment::Line(v.to_string()))),
-            token_parser!(data Space).map(|v| None),
-            token_parser!(data BlockComment).map(|v| Some(Comment::Block(v.to_string()))),
+            parse_LineComment.map(|v| Some(Comment::Line(v.to_string()))),
+            parse_Space.map(|_| None),
+            parse_BlockComment.map(|v| Some(Comment::Block(v.to_string()))),
         )
             .alt(),
     )(input)?;
-    Ok((input, whitespace.iter().filter_map(|v| *v).collect()))
+    Ok((input, whitespace.iter().filter_map(|v| v.clone()).collect()))
 }
 
 pub fn ws0<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
     let (input, whitespace) = many0(
         (
-            token_parser!(data LineComment).map(|v| Some(Comment::Line(v.to_string()))),
-            token_parser!(data Space).map(|v| None),
-            token_parser!(data BlockComment).map(|v| Some(Comment::Block(v.to_string()))),
+            parse_LineComment.map(|v| Some(Comment::Line(v.to_string()))),
+            parse_Space.map(|_| None),
+            parse_BlockComment.map(|v| Some(Comment::Block(v.to_string()))),
         )
             .alt(),
     )(input)?;
-    Ok((input, whitespace.iter().filter_map(|v| *v).collect()))
+    Ok((input, whitespace.iter().filter_map(|v| v.clone()).collect()))
 }
 
 pub fn vec_alt<'a, O, F: Fn(&Span<'a>) -> ParserResult<'a, O>>(
@@ -162,22 +160,14 @@ pub fn locate(text: &str, index: usize) -> Location {
     }
 }
 
-pub fn static_span(text: &'static str) -> Span<'static> {
-    let tokens = tokenize(text);
-    create_span(&tokens)
+pub trait ParseString<O> {
+    fn parse_string<'a>(&self, input: &'a str) -> ParserOutput<O>;
 }
 
-trait ParseString<'a, O, E> {
-    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O>;
-}
-
-impl<'a, O, F, E> ParseString<'a, O, E> for F
-where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
-{
-    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O> {
+impl<O, F: for<'a> Fn(&Span<'a>) -> ParserResult<'a, O>> ParseString<O> for F {
+    fn parse_string<'b>(&self, input: &'b str) -> ParserOutput<O> {
         let tokens = tokenize(input);
-        let span = create_span(&tokens);
-        self(&span)
+        let input = create_span(&tokens);
+        self(&input).to_output()
     }
-}
+} 

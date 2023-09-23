@@ -10,26 +10,26 @@ use crate::{
 use super::{generic::parse_generics, struct_statement::parse_struct_block};
 
 pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
-    let (input, _) = token_parser!(nodata Enum)(input)?;
+    let (input, _) = parse_Enum(input)?;
     let (input, _) = ws1(&input)?;
     let (input, name) = parse_identifier(&input)?;
     let (input, _) = ws0(&input)?;
     let (input, generics) = parse_generics(&input)?;
     let (input, _) = ws0(&input)?;
     let (input, options) = delimited(
-        (token_parser!(nodata LeftBrace), ws0).tuple(),
+        (parse_LeftBrace, ws0).tuple(),
         separated_list0(
-            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            (ws0, parse_Comma, ws0).tuple(),
             (
                 parse_identifier,
                 opt((
                     delimited(
-                        ws_delimited(token_parser!(nodata LeftParen)),
+                        ws_delimited(parse_LeftParen),
                         separated_list0(
-                            ws_delimited(token_parser!(nodata Comma)),
+                            ws_delimited(parse_Comma),
                             parse_expression,
                         ),
-                        ws_delimited(token_parser!(nodata RightParen)),
+                        ws_delimited(parse_RightParen),
                     )
                     .map(|v| EnumValue::Tuple(v)),
                     parse_struct_block.map(|v| EnumValue::Struct(v)),
@@ -44,9 +44,9 @@ pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
         ),
         (
             ws0,
-            opt(token_parser!(nodata Comma)),
+            opt(parse_Comma),
             ws0,
-            token_parser!(nodata RightBrace),
+            parse_RightBrace,
         )
             .tuple(),
     )(&input)?;

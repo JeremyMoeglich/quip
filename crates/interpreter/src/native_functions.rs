@@ -1,6 +1,5 @@
 use std::io::Write;
 
-use parser::fst::Operator;
 
 use super::state::{value::value::Value, value_ref::ValueRef};
 

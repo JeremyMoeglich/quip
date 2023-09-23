@@ -7,12 +7,12 @@ use super::parse_expression;
 
 pub fn parse_list<'a>(input: &Span<'a>) -> ParserResult<'a, Expression> {
     let (input, value) = delimited(
-        (token_parser!(nodata LeftBracket), MapParser::map(ws0, |_| ())).tuple(),
+        (parse_LeftBracket, MapParser::map(ws0, |_| ())).tuple(),
         separated_list0(
-            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            (ws0, parse_Comma, ws0).tuple(),
             parse_expression,
         ),
-        (token_parser!(nodata RightBracket), ws0).tuple(),
+        (parse_RightBracket, ws0).tuple(),
     )(&input)?;
     Ok((input, Expression::List(value)))
 }

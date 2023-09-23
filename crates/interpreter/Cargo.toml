@@ -9,6 +9,7 @@ edition = "2021"
 num = "0.4.0"
 pad = "0.1.6"
 parser = { path = "../parser" }
+ast = { path = "../ast" }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"

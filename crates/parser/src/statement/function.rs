@@ -10,7 +10,7 @@ use parser_core::*;
 use super::generic::parse_generics;
 
 pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
-    let (input, _) = token_parser!(nodata Fn)(input)?;
+    let (input, _) = parse_Fn(input)?;
     let (input, _) = ws1(&input)?;
     let (input, name) = parse_identifier(&input)?;
     let (input, _) = ws0(&input)?;
@@ -18,12 +18,12 @@ pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> 
     let (input, _) = ws0(&input)?;
 
     let (input, params) = delimited(
-        (token_parser!(nodata LeftParen), ws0).tuple(),
+        (parse_LeftParen, ws0).tuple(),
         separated_list0(
-            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            (ws0, parse_Comma, ws0).tuple(),
             (
                 parse_identifier,
-                opt((ws0, token_parser!(nodata Colon), ws0, parse_expression).tuple()).map(|v| {
+                opt((ws0, parse_Colon, ws0, parse_expression).tuple()).map(|v| {
                     match v {
                         Some((_, _, _, type_)) => type_,
                         None => Expression::Infer,
@@ -32,13 +32,13 @@ pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> 
             )
                 .tuple(),
         ),
-        (ws0, token_parser!(nodata RightParen)).tuple(),
+        (ws0, parse_RightParen).tuple(),
     )(&input)?;
 
     let (input, _) = ws0(&input)?;
 
     let (input, return_type) = opt(preceded(
-        ws_delimited(token_parser!(nodata Arrow)),
+        ws_delimited(parse_Arrow),
         parse_expression,
     ))
     .map(|v| match v {

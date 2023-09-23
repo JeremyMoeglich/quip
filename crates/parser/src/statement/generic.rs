@@ -8,7 +8,7 @@ use parser_core::*;
 
 fn parse_single_generic<'a>(input: &Span<'a>) -> ParserResult<'a, TypeGeneric> {
     let (input, name) = parse_identifier(&input)?;
-    let (input, type_) = opt((ws0, token_parser!(nodata Colon), ws0, parse_expression).tuple())
+    let (input, type_) = opt((ws0, parse_Colon, ws0, parse_expression).tuple())
         .map(|v| match v {
             Some((_, _, _, type_)) => type_,
             None => Expression::Infer,
@@ -24,12 +24,12 @@ fn parse_single_generic<'a>(input: &Span<'a>) -> ParserResult<'a, TypeGeneric> {
 
 pub fn parse_generics<'a>(input: &Span<'a>) -> ParserResult<'a, TypeGenerics> {
     match opt(delimited(
-        token_parser!(nodata LessThan),
+        parse_LessThan,
         separated_list0(
-            ws_delimited(token_parser!(nodata Comma)),
+            ws_delimited(parse_Comma),
             parse_single_generic,
         ),
-        token_parser!(nodata GreaterThan),
+        parse_GreaterThan,
     ))(&input)?
     {
         (input, Some(generics)) => Ok((input, generics)),

@@ -1,4 +1,3 @@
-use parser::fst::{Expression, Statement};
 
 use super::{
     expression::interpret_expression,
@@ -9,6 +8,9 @@ use super::{
         value_ref::ValueRef,
     },
 };
+
+use ast::Statement;
+use parser::core::*;
 
 pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Option<ValueRef> {
     match statement {

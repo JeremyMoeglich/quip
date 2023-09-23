@@ -30,15 +30,15 @@ pub fn parse_expression_with_rule(
             acond(rules.allow_operation, parse_operation(rules.clone())),
             parse_list,
             delimited(
-                (token_parser!(nodata LeftParen), ws0).tuple(),
+                (parse_LeftParen, ws0).tuple(),
                 parse_expression,
-                (ws0, token_parser!(nodata RightParen)).tuple(),
+                (ws0, parse_RightParen).tuple(),
             ),
             parse_object,
             delimited(
-                (token_parser!(nodata LeftBrace), ws0).tuple(),
+                (parse_LeftBrace, ws0).tuple(),
                 parse_code,
-                (ws0, token_parser!(nodata RightBrace)).tuple(),
+                (ws0, parse_RightBrace).tuple(),
             )
             .map(|code| Expression::Block(code)),
             parse_literal.map(|literal| Expression::Literal(literal)),
@@ -81,7 +81,7 @@ mod tests {
     use ast::Operator;
     use pretty_assertions::assert_eq;
 
-    use crate::utils::static_span;
+    use crate::utils::ParseString;
 
     use super::*;
 
@@ -90,21 +90,21 @@ mod tests {
         let tests = vec![
             (
                 "obj!.field(5, 2)",
-                parse_expression(&static_span("((obj!).field)(5, 2)"))
-                    .unwrap()
-                    .1,
+                parse_expression
+                    .parse_string("((obj!).field)(5, 2)")
+                    .unwrap(),
             ),
             (
                 r#"("5".to_int() + 5)"#,
-                parse_expression(&static_span(r#"((("5").to_int)() + 5)"#))
-                    .unwrap()
-                    .1,
+                parse_expression
+                    .parse_string(r#"((("5").to_int)() + 5)"#)
+                    .unwrap(),
             ),
             (
                 r#""5".to_int()"#,
                 Expression::Call(
                     Box::new(Expression::Operation(
-                        Box::new(parse_expression(&static_span(r#""5""#)).unwrap().1),
+                        Box::new(parse_expression.parse_string(r#""5""#).unwrap()),
                         Operator::Access,
                         Box::new(Expression::Variable("to_int".to_string())),
                     )),
@@ -114,7 +114,7 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            let (input, result) = parse_expression(&static_span(input)).unwrap();
+            let result = parse_expression.parse_string(input).unwrap();
             assert_eq!(result, expected);
         }
     }

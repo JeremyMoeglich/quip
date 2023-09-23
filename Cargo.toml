@@ -14,12 +14,10 @@ interpreter = { path = "crates/interpreter" }
 
 [workspace]
 members = [
-    "crates/analysis",
     "crates/parser",
     "crates/parser/parser_core",
-    "crates/parser/parser_proc",
+    "crates/proc_macros",
     "crates/interpreter",
     "crates/ast",
-    "crates/lexer",
     "."
 ]

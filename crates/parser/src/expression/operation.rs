@@ -400,18 +400,15 @@ fn parse_single_operator(
                 let t = (
                     single_parser,
                     delimited(
-                        (token_parser!(nodata LeftParen), ws0).tuple(),
-                        separated_list0(
-                            (ws0, token_parser!(nodata Comma), ws0).tuple(),
-                            parse_expression,
-                        ),
-                        (ws0, token_parser!(nodata RightParen)).tuple(),
+                        (parse_LeftParen, ws0).tuple(),
+                        separated_list0((ws0, parse_Comma, ws0).tuple(), parse_expression),
+                        (ws0, parse_RightParen).tuple(),
                     )
                     .map(|o| SingleOperatorData::Call(o)),
                     delimited(
-                        (token_parser!(nodata LeftBracket), ws0).tuple(),
+                        (parse_LeftBracket, ws0).tuple(),
                         parse_expression,
-                        (ws0, token_parser!(nodata RightBracket)).tuple(),
+                        (ws0, parse_RightBracket).tuple(),
                     )
                     .map(|o| SingleOperatorData::Get(o)),
                 );
@@ -530,9 +527,10 @@ pub fn parse_operation(
 
 #[cfg(test)]
 mod tests {
-    use crate::{expression::parse_expression, utils::static_span};
     use num::BigInt;
     use pretty_assertions::assert_eq;
+
+    use crate::utils::ParseString;
 
     use super::*;
 
@@ -541,51 +539,51 @@ mod tests {
         let tests = vec![
             (
                 "-5 ** 2",
-                parse_expression(&static_span("-(5 ** 2)")).unwrap().1,
+                parse_expression.parse_string("-(5 ** 2)").unwrap(),
             ),
             (
                 "!test.field",
-                parse_expression(&static_span("!(test.field)")).unwrap().1,
+                parse_expression.parse_string("!(test.field)").unwrap(),
             ),
             (
                 "-5 == 2",
-                parse_expression(&static_span("(-5) == (2)")).unwrap().1,
+                parse_expression.parse_string("(-5) == (2)").unwrap(),
             ),
             (
                 "-!5 ** 6",
-                parse_expression(&static_span("-((!5) ** 6)")).unwrap().1,
+                parse_expression.parse_string("-((!5) ** 6)").unwrap(),
             ),
             (
                 "5 ** 2 ** 3",
-                parse_expression(&static_span("5 ** (2 ** 3)")).unwrap().1,
+                parse_expression.parse_string("5 ** (2 ** 3)").unwrap(),
             ),
             (
                 "5 ** 2 * 3",
-                parse_expression(&static_span("(5 ** 2) * 3")).unwrap().1,
+                parse_expression.parse_string("(5 ** 2) * 3)").unwrap(),
             ),
             (
                 "5 * 2 ** 3",
-                parse_expression(&static_span("5 * (2 ** 3)")).unwrap().1,
+                parse_expression.parse_string("5 * (2 ** 3)").unwrap(),
             ),
             (
                 "5 * 2 * 3",
-                parse_expression(&static_span("(5 * 2) * 3")).unwrap().1,
+                parse_expression.parse_string("(5 * 2) * 3)").unwrap(),
             ),
             (
                 "5 + 2 * 3",
-                parse_expression(&static_span("5 + (2 * 3)")).unwrap().1,
+                parse_expression.parse_string("5 + (2 * 3)").unwrap(),
             ),
             (
                 "5 * 2 + 3",
-                parse_expression(&static_span("(5 * 2) + 3")).unwrap().1,
+                parse_expression.parse_string("(5 * 2) + 3)").unwrap(),
             ),
             (
                 "5 + 2 + 3",
-                parse_expression(&static_span("(5 + 2) + 3")).unwrap().1,
+                parse_expression.parse_string("(5 + 2) + 3)").unwrap(),
             ),
             (
                 "5 + 2 - 3",
-                parse_expression(&static_span("(5 + 2) - 3")).unwrap().1,
+                parse_expression.parse_string("(5 + 2) - 3)").unwrap(),
             ),
             (
                 "3 + 4",
@@ -602,9 +600,7 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            let (input, result) =
-                parse_operation(ExpressionParseRules::default())(&static_span(input)).unwrap();
-            assert_eq!(input.tokens.len(), 0);
+            let result = parse_expression.parse_string(input).unwrap();
             assert_eq!(result, expected);
         }
     }

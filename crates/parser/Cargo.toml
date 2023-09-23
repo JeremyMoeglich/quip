@@ -16,7 +16,6 @@ thiserror = "1.0.40"
 enum-kinds = "0.5.1"
 parser-core = { path = "./parser_core" }
 ast = { path = "../ast" }
-lexer = { path = "../lexer" }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"

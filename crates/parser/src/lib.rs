@@ -1,4 +1,5 @@
 #![feature(return_position_impl_trait_in_trait)]
+#![feature(closure_lifetime_binder)]
 
 mod block;
 mod error;
@@ -10,8 +11,11 @@ mod utils;
 use self::{statement::parse_statement, utils::ws0};
 use ast::CodeBlock;
 use error::create_fancy_error;
-use lexer::TokenKind;
 use parser_core::*;
+
+pub mod core {
+    pub use parser_core::*;
+}
 
 pub fn parse_code<'a>(input: &Span<'a>) -> ParserResult<'a, CodeBlock> {
     let (input, out) = many0(parse_statement)(input)?;

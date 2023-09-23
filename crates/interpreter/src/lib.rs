@@ -5,7 +5,6 @@ mod native_functions;
 pub mod state;
 mod statement;
 
-use parser::fst::CodeBlock;
 
 use self::{
     code_block::interpret_code_block,

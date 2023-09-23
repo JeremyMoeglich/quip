@@ -7,7 +7,7 @@ use ast::{CodeBlock, Expression, Statement, StatementInner};
 use parser_core::*;
 
 fn parse_if_block<'a>(input: &Span<'a>) -> ParserResult<'a, (Expression, CodeBlock)> {
-    let (input, _) = token_parser!(nodata If)(&input)?;
+    let (input, _) = parse_If(&input)?;
     let (input, _) = ws1(&input)?;
     let (input, condition) = parse_expression(&input)?;
     let (input, _) = ws0(&input)?;
@@ -18,11 +18,11 @@ fn parse_if_block<'a>(input: &Span<'a>) -> ParserResult<'a, (Expression, CodeBlo
 pub fn parse_if_statement<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
     let (input, first_block) = parse_if_block(&input)?;
     let (input, else_if_blocks) = many0(
-        (ws0, token_parser!(nodata Else), ws1, parse_if_block)
+        (ws0, parse_Else, ws1, parse_if_block)
             .tuple()
             .map(|e| e.3),
     )(&input)?;
-    let (input, else_block) = opt((ws0, token_parser!(nodata Else), ws1, parse_block)
+    let (input, else_block) = opt((ws0, parse_Else, ws1, parse_block)
         .tuple()
         .map(|v| v.3))(&input)?;
 

@@ -1,12 +1,10 @@
 #![feature(return_position_impl_trait_in_trait)]
-
-use std::cmp::Ordering;
-
+pub mod lexer;
+pub use lexer::*;
 use ast::Location;
-use lexer::{Token, TokenKind};
 mod error_union;
 use logos::Logos;
-use parser_proc::{generate_all_alt_impls, generate_all_tuple_impls};
+use proc_macros::{generate_all_alt_impls, generate_all_tuple_impls};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -161,7 +159,18 @@ impl LocatedParserError {
     }
 }
 
+pub type ParserOutput<O> = Result<O, LocatedParserError>;
 pub type ParserResult<'a, O> = Result<(Span<'a>, O), LocatedParserError>;
+
+pub trait ParserResultTrait<'a, O> {
+    fn to_output(self) -> ParserOutput<O>;
+}
+
+impl<'a, O> ParserResultTrait<'a, O> for ParserResult<'a, O> {
+    fn to_output(self) -> ParserOutput<O> {
+        self.map(|(_, o)| o)
+    }
+}
 
 impl<'a> Span<'a> {
     pub fn new(code: &'a [LocatedToken], start: Location) -> Self {
@@ -431,38 +440,6 @@ macro_rules! extract_token_data {
     };
 }
 
-#[macro_export]
-macro_rules! token_parser {
-    (data $token_kind:ident) => {
-        (move |input: &Span<'_>| {
-            let start = input.start;
-            let (input, first_span) = input.take_n_token(1)?;
-            let first = &first_span.tokens[0];
-            match first.token {
-                lexer::Token::$token_kind(data) => Ok((input, data)),
-                _ => Err(parser_core::ParserError::UnexpectedToken(
-                    first.kind(),
-                    vec![lexer::TokenKind::$token_kind],
-                ).locate(start)),
-            }
-        })
-    };
-    (nodata $token_kind:ident) => {
-        for<'a> move |input: &Span<'a>| -> ParserResult<'a, ()> {
-            let start = input.start;
-            let (input, first_span) = input.take_n_token(1)?;
-            let first = &first_span.tokens[0];
-            match first.token {
-                lexer::Token::$token_kind => Ok((input, ())),
-                _ => Err(parser_core::ParserError::UnexpectedToken(
-                    first.kind(),
-                    vec![lexer::TokenKind::$token_kind],
-                ).locate(start)),
-            }
-        }
-    };
-}
-
 pub trait Alt<'a, O> {
     fn alt<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> + 'b;
 }
@@ -470,7 +447,7 @@ pub trait Alt<'a, O> {
 generate_all_alt_impls!(16);
 
 pub trait Tuple<'a, O> {
-    fn tuple(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>;
+    fn tuple<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> + 'b;
 }
 
 generate_all_tuple_impls!(16);

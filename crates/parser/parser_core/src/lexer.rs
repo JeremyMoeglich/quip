@@ -1,11 +1,13 @@
 use enum_kinds::EnumKind;
 use logos::{internal::LexerInternal, Lexer, Logos};
 use num::{BigInt, Num};
+use proc_macros::TokenParser;
 use std::str::FromStr;
+use crate::*;
 
 use ast::Number;
 
-#[derive(Logos, Debug, PartialEq, Clone, EnumKind)]
+#[derive(Logos, Debug, PartialEq, Clone, EnumKind, TokenParser)]
 #[enum_kind(TokenKind)]
 pub enum Token<'a> {
     // Identifiers
@@ -137,7 +139,7 @@ pub enum Token<'a> {
     Fn,
     #[token("mut")]
     Mut,
-    
+
     // Comments
     #[regex(r"//.*")]
     LineComment(&'a str),

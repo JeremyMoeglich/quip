@@ -36,7 +36,7 @@ pub fn parse_statement<'a>(input: &Span<'a>) -> ParserResult<'a, Statement> {
         )
             .alt(),
         ws0,
-        opt(token_parser!(nodata Semicolon)),
+        opt(parse_Semicolon),
     )
         .tuple()
         .map(|(_, statement, _, semicolon)| Statement {

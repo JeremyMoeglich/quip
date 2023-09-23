@@ -1,5 +1,5 @@
 [package]
-name = "parser-proc"
+name = "proc_macros"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,7 +15,7 @@ logos = "0.13.0"
 oom = "0.3.0"
 thiserror = "1.0.40"
 enum-kinds = "0.5.1"
-syn = "2.0.33"
+syn = { version = "2.0.33", features = ["visit-mut"]}
 proc-macro2 = "1.0.67"
 quote = "1.0.33"
 
