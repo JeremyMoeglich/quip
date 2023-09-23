@@ -27,6 +27,15 @@ pub enum Token<'a> {
     #[regex("r#", raw_string_start)]
     RawString(&'a str),
 
+    #[token("true|false", |lex| {
+        if lex.slice() == "true" {
+            true
+        } else {
+            false
+        }
+    })]
+    Boolean(bool),
+
     // operators
     #[token("..")]
     Range,
@@ -91,7 +100,7 @@ pub enum Token<'a> {
     #[token("=")]
     Assign,
     #[token("->")]
-    ThinArrow,
+    Arrow,
     #[token("|")]
     VerticalBar,
     #[token("&")]
@@ -116,15 +125,19 @@ pub enum Token<'a> {
     Continue,
     #[token("return")]
     Return,
-    #[token("true|false", |lex| {
-        if lex.slice() == "true" {
-            true
-        } else {
-            false
-        }
-    })]
-    Boolean(bool),
-
+    #[token("struct")]
+    Struct,
+    #[token("enum")]
+    Enum,
+    #[token("impl")]
+    Impl,
+    #[token("type")]
+    Type,
+    #[token("fn")]
+    Fn,
+    #[token("mut")]
+    Mut,
+    
     // Comments
     #[regex(r"//.*")]
     LineComment(&'a str),
@@ -134,6 +147,8 @@ pub enum Token<'a> {
     // Whitespace
     #[regex(r"( |\n|\t)*")]
     Space(&'a str),
+
+    EOF,
 
     Error,
 }
@@ -170,7 +185,7 @@ impl TokenKind {
             TokenKind::LeftBrace => Some(1),
             TokenKind::RightBrace => Some(1),
             TokenKind::Assign => Some(1),
-            TokenKind::ThinArrow => Some(2),
+            TokenKind::Arrow => Some(2),
             TokenKind::Let => Some(3),
             TokenKind::If => Some(2),
             TokenKind::Else => Some(4),

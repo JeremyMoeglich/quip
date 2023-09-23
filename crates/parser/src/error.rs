@@ -1,20 +1,6 @@
+use ast::Location;
 use pad::{Alignment, PadStr};
-
-use super::utils::{locate, Location};
-use crate::core::Span;
-
-pub fn create_fancy_error(original: &str, error: nom::Err<nom::error::Error<Span>>) -> String {
-    match error {
-        nom::Err::Incomplete(_) => panic!("Streaming not supported"),
-        nom::Err::Error(err) => {
-            let span = err.input;
-            let mut fancy_error = create_fancy_error_span(original, span);
-            fancy_error.push_str(&format!("\n{}", err));
-            fancy_error
-        }
-        nom::Err::Failure(_) => panic!("Failure not supported"),
-    }
-}
+use parser_core::LocatedParserError;
 
 fn add_line_numbers(text: &str, to_map_locations: Vec<Location>) -> (String, Vec<Location>) {
     let max_line_number_width = text.lines().count().to_string().len();
@@ -43,6 +29,7 @@ fn add_line_numbers(text: &str, to_map_locations: Vec<Location>) -> (String, Vec
             Location {
                 line: location.line,
                 column: location.column + prefix_length,
+                index: location.index + prefix_length,
             }
         })
         .collect::<Vec<_>>();
@@ -55,9 +42,9 @@ fn add_line_numbers_single(text: &str, to_map_location: Location) -> (String, Lo
     (new_text, new_locations[0])
 }
 
-fn mark_code(text: &str, error_char_index: usize, padding: usize) -> String {
+fn mark_code(text: &str, location: Location, padding: usize) -> String {
     // mark a line of code with a ^ at the start of the error and show the nearest {padding} lines
-    let (text, location) = add_line_numbers_single(text, locate(text, error_char_index));
+    let (text, location) = add_line_numbers_single(text, location);
 
     let lines = text.lines().collect::<Vec<&str>>();
 
@@ -84,17 +71,10 @@ fn mark_code(text: &str, error_char_index: usize, padding: usize) -> String {
     )
 }
 
-pub fn create_fancy_error_span(original: &str, span: Span) -> String {
-    let location = locate(original, span.location_offset());
-    let line = location.line + 1;
-    let column = location.column + 1;
-    let mut fancy_error = format!("Syntax Error at line {}, column {}:\n", line, column);
-
+pub fn create_fancy_error(original: &str, err: LocatedParserError) -> String {
     let padding = 2;
 
-    let marked = mark_code(original, span.location_offset(), padding);
+    let marked = mark_code(original, err.location, padding);
 
-    fancy_error.push_str(&marked);
-
-    fancy_error
+    format!("{}{}", err, marked)
 }

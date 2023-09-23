@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, LitInt};
 use proc_macro2::Span;
+use quote::quote;
 use syn::Ident;
+use syn::{parse_macro_input, LitInt};
 
 #[proc_macro]
 pub fn generate_all_tuple_impls(input: TokenStream) -> TokenStream {
@@ -45,7 +45,6 @@ pub fn generate_all_tuple_impls(input: TokenStream) -> TokenStream {
     all_tokens.into()
 }
 
-
 #[proc_macro]
 pub fn generate_all_alt_impls(input: TokenStream) -> TokenStream {
     let n: usize = {
@@ -64,7 +63,7 @@ pub fn generate_all_alt_impls(input: TokenStream) -> TokenStream {
 
         let tokens = quote! {
             impl<'a, Out, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, Out>),*> Alt<'a, Out> for (#(#fn_names,)*) {
-                fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out> {
+                fn alt<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out> + 'b {
                     move |input: &Span<'a>| {
                         let mut err = None;
                         #(

@@ -1,15 +1,15 @@
-use ast::Statement;
+use ast::{EnumValue, StatementInner};
 use parser_core::*;
 
 use crate::{
+    expression::parse_expression,
     identifier::parse_identifier,
-    type_expression::parse_type_expression,
     utils::{opt, ws0, ws1, ws_delimited},
 };
 
-use super::generic::parse_generics;
+use super::{generic::parse_generics, struct_statement::parse_struct_block};
 
-pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, TokenParserError> {
+pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
     let (input, _) = token_parser!(nodata Enum)(input)?;
     let (input, _) = ws1(&input)?;
     let (input, name) = parse_identifier(&input)?;
@@ -22,17 +22,22 @@ pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, TokenPars
             (ws0, token_parser!(nodata Comma), ws0).tuple(),
             (
                 parse_identifier,
-                opt(delimited(
-                    ws_delimited(token_parser!(nodata LeftParen)),
-                    separated_list0(
-                        ws_delimited(token_parser!(nodata Comma)),
-                        parse_type_expression,
-                    ),
-                    ws_delimited(token_parser!(nodata RightParen)),
-                ))
+                opt((
+                    delimited(
+                        ws_delimited(token_parser!(nodata LeftParen)),
+                        separated_list0(
+                            ws_delimited(token_parser!(nodata Comma)),
+                            parse_expression,
+                        ),
+                        ws_delimited(token_parser!(nodata RightParen)),
+                    )
+                    .map(|v| EnumValue::Tuple(v)),
+                    parse_struct_block.map(|v| EnumValue::Struct(v)),
+                )
+                    .alt())
                 .map(|v| match v {
                     Some(type_) => type_,
-                    None => vec![],
+                    None => EnumValue::Tuple(vec![]),
                 }),
             )
                 .tuple(),
@@ -44,6 +49,13 @@ pub fn parse_enum<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, TokenPars
             token_parser!(nodata RightBrace),
         )
             .tuple(),
-    )(input)?;
-    Ok((input, Statement::Enum(name, generics, options)))
+    )(&input)?;
+    Ok((
+        input,
+        StatementInner::Enum {
+            name,
+            type_generics: generics,
+            options,
+        },
+    ))
 }

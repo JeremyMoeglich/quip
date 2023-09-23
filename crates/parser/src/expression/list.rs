@@ -5,7 +5,7 @@ use crate::utils::ws0;
 
 use super::parse_expression;
 
-pub fn parse_list<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, TakeParserError> {
+pub fn parse_list<'a>(input: &Span<'a>) -> ParserResult<'a, Expression> {
     let (input, value) = delimited(
         (token_parser!(nodata LeftBracket), MapParser::map(ws0, |_| ())).tuple(),
         separated_list0(

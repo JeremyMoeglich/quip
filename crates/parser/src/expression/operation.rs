@@ -1,7 +1,7 @@
 use ast::*;
 use lexer::TokenKind;
 
-use crate::utils::{vec_alt, ws0, VecAltError};
+use crate::utils::{vec_alt, ws0};
 use parser_core::*;
 
 use super::{parse_expression, parse_expression_with_rule, ExpressionParseRules};
@@ -377,17 +377,15 @@ impl Segment {
     }
 }
 
-combine_errors!(pub SingleOperatorError, VecAltError, TakeParserError);
-
 fn parse_single_operator(
     side: Direction,
-) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, SingleOperatorData, SingleOperatorError> {
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, SingleOperatorData> {
     // Parse a single operator
     // Example: !, -, +, etc
     // This also includes function calls and array / object indexing (on the right side)
 
     move |input: &Span| {
-        let mut single_parser = vec_alt(
+        let single_parser = vec_alt(
             SINGLE_OPERATORS
                 .iter()
                 .filter(|o| o.side == side)
@@ -396,28 +394,30 @@ fn parse_single_operator(
                 })
                 .collect::<Vec<_>>(),
         );
-
         let (input, operator) = match side {
             Direction::Left => single_parser(&input),
-            Direction::Right => (
-                single_parser,
-                delimited(
-                    (token_parser!(nodata LeftParen), ws0).tuple(),
-                    separated_list0(
-                        (ws0, token_parser!(nodata Comma), ws0).tuple(),
+            Direction::Right => {
+                let t = (
+                    single_parser,
+                    delimited(
+                        (token_parser!(nodata LeftParen), ws0).tuple(),
+                        separated_list0(
+                            (ws0, token_parser!(nodata Comma), ws0).tuple(),
+                            parse_expression,
+                        ),
+                        (ws0, token_parser!(nodata RightParen)).tuple(),
+                    )
+                    .map(|o| SingleOperatorData::Call(o)),
+                    delimited(
+                        (token_parser!(nodata LeftBracket), ws0).tuple(),
                         parse_expression,
-                    ),
-                    (ws0, token_parser!(nodata RightParen)).tuple(),
-                )
-                .map(|o| SingleOperatorData::Call(o)),
-                delimited(
-                    (token_parser!(nodata LeftBracket), ws0).tuple(),
-                    parse_expression,
-                    (ws0, token_parser!(nodata RightBracket)).tuple(),
-                )
-                .map(|o| SingleOperatorData::Get(o)),
-            )
-                .alt()(&input),
+                        (ws0, token_parser!(nodata RightBracket)).tuple(),
+                    )
+                    .map(|o| SingleOperatorData::Get(o)),
+                );
+                let parser = t.alt();
+                parser(&input)
+            }
         }?;
         let (input, _) = ws0(&input)?;
 
@@ -427,7 +427,7 @@ fn parse_single_operator(
 
 fn parse_segment(
     rules: ExpressionParseRules,
-) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Segment, TakeParserError> {
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Segment> {
     move |input: &Span| {
         let mut input = input.clone();
         let mut left_side_operators = Vec::new();
@@ -456,18 +456,23 @@ fn parse_segment(
     }
 }
 
-fn parse_operator<'a>(input: &Span<'a>) -> ParserResult<'a, OrderedOperator, TokenParserError> {
+fn parse_operator<'a>(input: &Span<'a>) -> ParserResult<'a, OrderedOperator> {
+    let start = input.start;
+    let (input, token) = input.take_token()?;
     for operator in OPERATORS.iter() {
-        if let Ok((input, _)) = token(operator.token)(input) {
-            return Ok((input, (*operator).clone()));
+        if operator.token == token.kind() {
+            return Ok((input, operator.clone()));
         }
     }
-    Err(TokenParserSubError::WrongTokenKind.into())
+    Err(
+        ParserError::UnexpectedToken(token.kind(), OPERATORS.iter().map(|o| o.token).collect())
+            .locate(start),
+    )
 }
 
 fn parse_operator_and_segment<'a>(
     input: &Span<'a>,
-) -> ParserResult<'a, (OrderedOperator, Segment), TokenParserError> {
+) -> ParserResult<'a, (OrderedOperator, Segment)> {
     let (input, _) = ws0(input)?;
     let (input, operator) = parse_operator(&input)?;
     let (input, _) = ws0(&input)?;
@@ -483,7 +488,7 @@ fn parse_operator_and_segment<'a>(
 
 pub fn parse_operation(
     rules: ExpressionParseRules,
-) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression, TokenParserError> {
+) -> impl for<'a> Fn(&Span<'a>) -> ParserResult<'a, Expression> {
     move |input: &Span| {
         let (input, mut left_side) = parse_segment(rules)(input)?;
         let (mut input, (mut operator, mut right_side)) =

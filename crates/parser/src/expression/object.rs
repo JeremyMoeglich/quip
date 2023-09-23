@@ -8,7 +8,7 @@ use crate::{
 
 use super::parse_expression;
 
-pub fn parse_object<'a>(input: &Span<'a>) -> ParserResult<'a, Expression, TakeParserError> {
+pub fn parse_object<'a>(input: &Span<'a>) -> ParserResult<'a, Expression> {
     let (input, name) = opt(parse_identifier)(input)?;
     let (input, _) = ws0(&input)?;
     let (input, _) = token_parser!(nodata LeftBrace)(&input)?;

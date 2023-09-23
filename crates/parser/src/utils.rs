@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-use ast::{Comment, Location, Whitespace};
-use lexer::{Token, TokenKind};
+use ast::{Comment, Location};
+use lexer::Token;
 use parser_core::*;
 use thiserror::Error;
 
 // Utils for parsing
 
-pub fn ws1<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>, TakeParserError> {
+pub fn ws1<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
     let (input, whitespace) = many1(
         (
             token_parser!(data LineComment).map(|v| Some(Comment::Line(v.to_string()))),
@@ -19,7 +19,7 @@ pub fn ws1<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>, TakeParserErr
     Ok((input, whitespace.iter().filter_map(|v| *v).collect()))
 }
 
-pub fn ws0<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>, TakeParserError> {
+pub fn ws0<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
     let (input, whitespace) = many0(
         (
             token_parser!(data LineComment).map(|v| Some(Comment::Line(v.to_string()))),
@@ -31,47 +31,61 @@ pub fn ws0<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>, TakeParserErr
     Ok((input, whitespace.iter().filter_map(|v| *v).collect()))
 }
 
-#[derive(Error, Debug)]
-pub enum VecAltError {
-    #[error("No parser matched")]
-    NoParserMatched,
-}
-
-pub fn vec_alt<'a, O, F, E: From<VecAltError>, E2>(
+pub fn vec_alt<'a, O, F: Fn(&Span<'a>) -> ParserResult<'a, O>>(
     parsers: Vec<F>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>
-where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O, E2>,
-{
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> {
     move |input| {
+        let mut best_error = ParserError::InactiveParser.locate(input.start);
         for parser in parsers.iter() {
             let result = parser(input);
             match result {
                 Ok((input, value)) => return Ok((input, value)),
-                Err(_) => continue,
+                Err(e) => {
+                    if e.better_than(&best_error) {
+                        best_error = e;
+                    } else if e.location == best_error.location {
+                        match (e.error, best_error.error.clone()) {
+                            (
+                                ParserError::UnexpectedToken(got1, expected1),
+                                ParserError::UnexpectedToken(got2, expected2),
+                            ) => {
+                                if got1 != got2 {
+                                    unreachable!(
+                                        "Got two different tokens at the same location: {:?} {:?} at {}",
+                                        got1, got2, e.location
+                                    )
+                                }
+                                best_error = ParserError::UnexpectedToken(
+                                    got1,
+                                    expected1.iter().chain(expected2.iter()).cloned().collect(),
+                                )
+                                .locate(e.location);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
-        Err(VecAltError::NoParserMatched.into())
+        Err(best_error)
     }
 }
 
-pub fn ws_delimited<'a, O, F, E: From<TakeParserError>>(
-    parser: F,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, E>
+pub fn ws_delimited<'a, O, F>(parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>
 where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O, E>,
+    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
 {
     move |input| {
-        let (input, whitespace_before) = ws0(input)?;
+        let (input, _) = ws0(input)?;
         let (input, value) = parser(&input)?;
-        let (input, whitespace_after) = ws0(&input)?;
+        let (input, _) = ws0(&input)?;
         Ok((input, value))
     }
 }
 
-pub fn vec_tuple<'a, O, F, E>(parsers: Vec<F>) -> impl Fn(Span<'a>) -> ParserResult<Vec<O>, E>
+pub fn vec_tuple<'a, O, F, E>(parsers: Vec<F>) -> impl Fn(Span<'a>) -> ParserResult<Vec<O>>
 where
-    F: Fn(Span<'a>) -> ParserResult<O, E>,
+    F: Fn(Span<'a>) -> ParserResult<O>,
 {
     move |input| {
         let mut result = Ok((input, Vec::new()));
@@ -89,29 +103,19 @@ where
     }
 }
 
-#[derive(Error, Debug)]
-pub enum AcondError<E> {
-    #[error("Parser inactive")]
-    ParserInactive,
-    #[error("Parser error: {0}")]
-    ParserError(E),
-}
-
-pub fn acond<'a, O, F, E>(boolean: bool, parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O, AcondError<E>>
+pub fn acond<'a, O, F>(boolean: bool, parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>
 where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O, E>,
+    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
 {
     move |input| match boolean {
-        true => parser(input).map_err(|e| AcondError::ParserError(e)),
-        false => Err(AcondError::ParserInactive),
+        true => parser(input),
+        false => Err(ParserError::InactiveParser.locate(input.start)),
     }
 }
 
-pub fn opt<'a, O, F, E: From<TakeParserError>>(
-    parser: F,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, Option<O>, E>
+pub fn opt<'a, O, F>(parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, Option<O>>
 where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O, E>,
+    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
 {
     move |input| match parser(input) {
         Ok((input, value)) => Ok((input, Some(value))),
@@ -119,15 +123,15 @@ where
     }
 }
 
-pub fn separated_pair<'a, O1, O2, O3, F1, F2, F3, E: From<TakeParserError>>(
+pub fn separated_pair<'a, O1, O2, O3, F1, F2, F3>(
     parser1: F1,
     parser2: F2,
     parser3: F3,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, (O1, O3), E>
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, (O1, O3)>
 where
-    F1: Fn(&Span<'a>) -> ParserResult<'a, O1, E>,
-    F2: Fn(&Span<'a>) -> ParserResult<'a, O2, E>,
-    F3: Fn(&Span<'a>) -> ParserResult<'a, O3, E>,
+    F1: Fn(&Span<'a>) -> ParserResult<'a, O1>,
+    F2: Fn(&Span<'a>) -> ParserResult<'a, O2>,
+    F3: Fn(&Span<'a>) -> ParserResult<'a, O3>,
 {
     move |input| {
         let (input, value1) = parser1(input)?;
@@ -164,14 +168,14 @@ pub fn static_span(text: &'static str) -> Span<'static> {
 }
 
 trait ParseString<'a, O, E> {
-    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O, E>;
+    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O>;
 }
 
 impl<'a, O, F, E> ParseString<'a, O, E> for F
 where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O, E>,
+    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
 {
-    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O, E> {
+    fn parse_string(&self, input: &'a str) -> ParserResult<'a, O> {
         let tokens = tokenize(input);
         let span = create_span(&tokens);
         self(&span)

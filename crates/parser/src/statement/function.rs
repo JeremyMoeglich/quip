@@ -1,15 +1,15 @@
-use ast::{Statement, TypeExpression};
-use parser_core::*;
 use crate::{
     block::parse_block,
+    expression::parse_expression,
     identifier::parse_identifier,
-    type_expression::parse_type_expression,
     utils::{opt, ws0, ws1, ws_delimited},
 };
+use ast::{Expression, StatementInner, TypedIdentifier};
+use parser_core::*;
 
 use super::generic::parse_generics;
 
-pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, TokenParserError> {
+pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInner> {
     let (input, _) = token_parser!(nodata Fn)(input)?;
     let (input, _) = ws1(&input)?;
     let (input, name) = parse_identifier(&input)?;
@@ -23,13 +23,14 @@ pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, Token
             (ws0, token_parser!(nodata Comma), ws0).tuple(),
             (
                 parse_identifier,
-                opt(
-                    (ws0, token_parser!(nodata Colon), ws0, parse_type_expression).tuple()
-                ).map(|v| match v {
-                    Some((_, _, _, type_)) => type_,
-                    None => TypeExpression::Infer,
-                })
-            ).tuple(),
+                opt((ws0, token_parser!(nodata Colon), ws0, parse_expression).tuple()).map(|v| {
+                    match v {
+                        Some((_, _, _, type_)) => type_,
+                        None => Expression::Infer,
+                    }
+                }),
+            )
+                .tuple(),
         ),
         (ws0, token_parser!(nodata RightParen)).tuple(),
     )(&input)?;
@@ -38,10 +39,11 @@ pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, Token
 
     let (input, return_type) = opt(preceded(
         ws_delimited(token_parser!(nodata Arrow)),
-        parse_type_expression,
-    )).map(|v| match v {
+        parse_expression,
+    ))
+    .map(|v| match v {
         Some(type_) => type_,
-        None => TypeExpression::Infer,
+        None => Expression::Infer,
     })(&input)?;
 
     let (input, _) = ws0(&input)?;
@@ -49,15 +51,18 @@ pub fn parse_function<'a>(input: &Span<'a>) -> ParserResult<'a, Statement, Token
 
     Ok((
         input,
-        Statement::Function(
+        StatementInner::Function {
             name,
             generics,
-            params
+            params: params
                 .iter()
-                .map(|(name, type_)| (name.clone(), type_.clone()))
+                .map(|(name, type_)| TypedIdentifier {
+                    expression: type_.clone(),
+                    identifier: name.clone(),
+                })
                 .collect::<Vec<_>>(),
-            return_type,
-            code,
-        ),
+            ret_type: return_type,
+            body: code,
+        },
     ))
 }

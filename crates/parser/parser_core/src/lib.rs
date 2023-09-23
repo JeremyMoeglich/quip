@@ -1,5 +1,7 @@
 #![feature(return_position_impl_trait_in_trait)]
 
+use std::cmp::Ordering;
+
 use ast::Location;
 use lexer::{Token, TokenKind};
 mod error_union;
@@ -68,12 +70,6 @@ pub fn create_span<'a>(tokens: &'a [LocatedToken<'a>]) -> Span<'a> {
     Span { start, tokens }
 }
 
-#[derive(Error, Debug)]
-pub enum TakeParserError {
-    #[error("There weren't enough tokens left to take")]
-    EndOfInput,
-}
-
 pub trait TokensLength {
     fn len(&self) -> usize;
     fn new_lines(&self) -> usize;
@@ -112,8 +108,8 @@ impl TokensLength for Span<'_> {
     }
 }
 
-#[derive(Error, Debug)]
-enum ParserError {
+#[derive(Error, Debug, Clone)]
+pub enum ParserError {
     #[error("Unexpected token {0:?}, expected one of {1:?}")]
     UnexpectedToken(TokenKind, Vec<TokenKind>), // Got, Expected
     #[error("Unexpected end of input")]
@@ -122,7 +118,7 @@ enum ParserError {
     InactiveParser,
 }
 impl ParserError {
-    fn locate(self, location: Location) -> LocatedParserError {
+    pub fn locate(self, location: Location) -> LocatedParserError {
         LocatedParserError::new(self, location)
     }
 }
@@ -135,19 +131,32 @@ pub struct LocatedParserError {
 }
 
 impl LocatedParserError {
-    fn new(error: ParserError, location: Location) -> Self {
+    pub fn new(error: ParserError, location: Location) -> Self {
         LocatedParserError { error, location }
     }
-    fn map_error<F: Fn(ParserError) -> ParserError>(self, wrapper: F) -> Self {
+    pub fn map_error<F: Fn(ParserError) -> ParserError>(self, wrapper: F) -> Self {
         Self {
             error: wrapper(self.error),
             location: self.location,
         }
     }
-    fn map_location<F: Fn(Location) -> Location>(self, wrapper: F) -> Self {
+    pub fn map_location<F: Fn(Location) -> Location>(self, wrapper: F) -> Self {
         Self {
             error: self.error,
             location: wrapper(self.location),
+        }
+    }
+    pub fn better_than(&self, other: &LocatedParserError) -> bool {
+        use ParserError::*;
+
+        match (&self.error, &other.error) {
+            (EndOfInput, EndOfInput)
+            | (UnexpectedToken(_, _), UnexpectedToken(_, _))
+            | (InactiveParser, InactiveParser) => self.location > other.location,
+            (EndOfInput, _) => true,
+            (_, EndOfInput) => false,
+            (UnexpectedToken(_, _), _) => true,
+            (_, UnexpectedToken(_, _)) => false,
         }
     }
 }
@@ -425,37 +434,37 @@ macro_rules! extract_token_data {
 #[macro_export]
 macro_rules! token_parser {
     (data $token_kind:ident) => {
-        move |input: &Span<'_>| {
+        (move |input: &Span<'_>| {
+            let start = input.start;
             let (input, first_span) = input.take_n_token(1)?;
             let first = &first_span.tokens[0];
-            if first.kind() == lexer::TokenKind::$token_kind {
-                match first.token {
-                    Token::$token_kind(data) => Ok((input, data)),
-                    _ => Err(parser_core::TokenParserSubError::WrongTokenKind.into()),
-                }
-            } else {
-                Err(parser_core::TokenParserSubError::WrongTokenKind.into())
+            match first.token {
+                lexer::Token::$token_kind(data) => Ok((input, data)),
+                _ => Err(parser_core::ParserError::UnexpectedToken(
+                    first.kind(),
+                    vec![lexer::TokenKind::$token_kind],
+                ).locate(start)),
             }
-        }
+        })
     };
     (nodata $token_kind:ident) => {
-        move |input: &Span<'_>| {
+        for<'a> move |input: &Span<'a>| -> ParserResult<'a, ()> {
+            let start = input.start;
             let (input, first_span) = input.take_n_token(1)?;
             let first = &first_span.tokens[0];
-            if first.kind() == lexer::TokenKind::$token_kind {
-                match first.token {
-                    lexer::Token::$token_kind => Ok((input, ())),
-                    _ => Err(parser_core::TokenParserSubError::WrongTokenKind.into()),
-                }
-            } else {
-                Err(parser_core::TokenParserSubError::WrongTokenKind.into())
+            match first.token {
+                lexer::Token::$token_kind => Ok((input, ())),
+                _ => Err(parser_core::ParserError::UnexpectedToken(
+                    first.kind(),
+                    vec![lexer::TokenKind::$token_kind],
+                ).locate(start)),
             }
         }
     };
 }
 
 pub trait Alt<'a, O> {
-    fn alt(&'a self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>;
+    fn alt<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> + 'b;
 }
 
 generate_all_alt_impls!(16);
@@ -470,12 +479,13 @@ pub fn token<'a>(
     token_kind: TokenKind,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, &'a LocatedToken<'a>> {
     move |input: &Span<'a>| {
+        let location = input.start;
         let (input, first_span) = input.take_n_token(1)?;
         let first = &first_span.tokens[0];
         if first.kind() == token_kind {
             Ok((input, first))
         } else {
-            Err(ParserError::UnexpectedToken(first.kind(), vec![token_kind]).locate())
+            Err(ParserError::UnexpectedToken(first.kind(), vec![token_kind]).locate(location))
         }
     }
 }
