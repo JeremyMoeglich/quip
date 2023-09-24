@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use num::BigInt;
 
-use crate::interpreter::state::{function::Function, value_ref::ValueRef};
+
+use crate::state::{function::Function, value_ref::ValueRef};
 
 use super::{mutability::ValueMutability, types::ValueType};
 

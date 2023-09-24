@@ -1,4 +1,3 @@
-
 use super::{
     expression::interpret_expression,
     state::{
@@ -8,20 +7,17 @@ use super::{
         value_ref::ValueRef,
     },
 };
+use ast::{Expression, StatementInner};
 
-use ast::Statement;
-use parser::core::*;
-
-pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Option<ValueRef> {
-    match statement {
-        Statement::StopReturn(statement) => match interpret_statement(statement, state) {
-            Some(value) => match *value.resolve().get() {
-                Value::Error(_) => Some(value),
-                _ => None,
-            },
-            None => None,
-        },
-        Statement::Assignment(to_change, value) => {
+pub fn interpret_inner_statement(
+    inner_statement: &StatementInner,
+    state: &ProgramState,
+) -> Option<ValueRef> {
+    match inner_statement {
+        StatementInner::Assignment {
+            left: to_change,
+            right: value,
+        } => {
             let value_ref = interpret_expression(value, state);
             if let Value::Error(_) = *value_ref.resolve().get() {
                 return Some(value_ref);
@@ -44,7 +40,11 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Optio
                 }
             }
         }
-        Statement::Declaration((name, _), _, value) => {
+        StatementInner::Declaration {
+            identifier,
+            mutable,
+            initializer: value,
+        } => {
             let value = match value {
                 Some(value) => match interpret_expression(value, state) {
                     value_ref => match *value_ref.resolve().get() {
@@ -54,13 +54,19 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Optio
                 },
                 None => return None,
             };
-            state.set_new_variable(name, value);
+            state.set_new_variable(&identifier.identifier, value);
             None
         }
-        Statement::Function(name, _generics, parameters, _return_type, body) => {
+        StatementInner::Function {
+            name,
+            generics: _generics,
+            params: parameters,
+            ret_type: _return_type,
+            body,
+        } => {
             let function = Function {
                 name: name.clone(),
-                parameters: parameters.iter().map(|(name, _)| name.clone()).collect(), // TODO: type annotations
+                parameters: parameters.iter().map(|param| name.clone()).collect(),
                 body: body.clone(),
                 return_type: "TODO".to_string(),
                 outer_state: state.clone(),
@@ -68,15 +74,19 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Optio
             state.set_new_variable(name, ValueRef::new(Value::Function(function)));
             None
         }
-        Statement::Expression(expression) => {
+        StatementInner::Expression { expr: expression } => {
             let value = interpret_expression(expression, state);
             Some(value)
         }
-        Statement::Scope(code_block) => {
+        StatementInner::Scope { body: code_block } => {
             let (value, _) = super::code_block::interpret_code_block(code_block, state, vec![]);
             Some(value)
         }
-        Statement::If(condition, if_block, else_block) => {
+        StatementInner::If {
+            condition,
+            then_block: if_block,
+            else_block,
+        } => {
             let condition = interpret_expression(condition, state).resolve();
             if let Value::Error(_) = &*condition.clone().get() {
                 return Some(condition);
@@ -95,6 +105,6 @@ pub fn interpret_statement(statement: &Statement, state: &ProgramState) -> Optio
                 panic!("Condition should be a boolean");
             }
         }
-        _ => unimplemented!("Statement not implemented {:?}", statement),
+        _ => unimplemented!("StatementInner not implemented {:?}", inner_statement),
     }
 }

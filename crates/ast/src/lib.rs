@@ -27,7 +27,7 @@ impl Ord for Location {
 
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "line:{} - col:{}", self.line, self.column)
+        write!(f, "line:{} - col:{}", self.line + 1, self.column)
     }
 }
 
@@ -179,6 +179,7 @@ pub enum Operator {
     Power,
     Access,
     Pipe,
+    Union
 }
 
 #[derive(Debug, Clone, PartialEq)]

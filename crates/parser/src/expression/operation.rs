@@ -29,7 +29,7 @@ struct OrderedSingleOperator {
     side: Direction,
 }
 
-const OPERATORS: [OrderedOperator; 16] = [
+const OPERATORS: [OrderedOperator; 17] = [
     OrderedOperator {
         token: TokenKind::Range,
         operator: Operator::Range,
@@ -100,6 +100,13 @@ const OPERATORS: [OrderedOperator; 16] = [
     //    allow_repeat: true,
     //    direction: Direction::Right,
     //}, // This operator has a collision with the unwrap operator (?) so it is disabled for now
+    OrderedOperator {
+        token: TokenKind::VerticalBar,
+        operator: Operator::Union,
+        priority: 3,
+        allow_repeat: true,
+        direction: Direction::Right,
+    },
     OrderedOperator {
         token: TokenKind::Plus,
         operator: Operator::Add,

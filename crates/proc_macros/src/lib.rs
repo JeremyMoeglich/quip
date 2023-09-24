@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use syn::visit_mut::VisitMut;
 use syn::{parse_macro_input, Generics, LitInt};
 use syn::{Data, DataEnum, DeriveInput, Fields, Ident};
@@ -72,7 +72,10 @@ pub fn generate_all_alt_impls(input: TokenStream) -> TokenStream {
                                 Ok(res) => return Ok(res),
                                 Err(e) => {
                                     if err.is_none() {
-                                        err = Some(e);
+                                        err = match err {
+                                            None => Some(e),
+                                            Some(last) => Some(last.accumulate(e)), 
+                                        }
                                     }
                                 }
                             }

@@ -1,16 +1,13 @@
-use crate::{
-    interpreter::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef},
-    parser::fst::Literal,
-};
-
-use super::string::interpret_string;
+use crate::state::{program_state::ProgramState, value::value::Value, value_ref::ValueRef};
+use ast::{Literal, Number};
 
 pub fn interpret_literal(literal: &Literal, state: &ProgramState) -> ValueRef {
     match literal {
-        Literal::Integer(number) => ValueRef::new(Value::Integer(number.clone())),
-        Literal::String(string) => interpret_string(string, state),
+        Literal::Number(number) => match number {
+            Number::Float(flt) => ValueRef::new(Value::Float(*flt)),
+            Number::Integer(int) => ValueRef::new(Value::Integer(int.clone())),
+        },
+        Literal::String(string) => ValueRef::new(Value::String(string.clone())),
         Literal::Boolean(boolean) => ValueRef::new(Value::Boolean(*boolean)),
-        Literal::None => ValueRef::none(),
-        Literal::Float(number) => ValueRef::new(Value::Float(*number)),
     }
 }

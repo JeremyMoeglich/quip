@@ -1,12 +1,11 @@
-use crate::interpreter::state::{
-    program_state::ProgramState, value::value::Value, value_ref::ValueRef,
-};
+use crate::state::{program_state::ProgramState, value_ref::ValueRef, value::value::Value};
+
 
 pub fn interpret_variable(name: &str, state: &ProgramState) -> ValueRef {
     state
         .get_variable(name)
         .unwrap_or(ValueRef::new(Value::Error(format!(
-            "Variable '{}' not found",
+            "Variable '{}' not foundF",
             name
         ))))
 }

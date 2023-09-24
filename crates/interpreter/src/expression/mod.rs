@@ -4,10 +4,9 @@ mod list;
 mod literal;
 mod operation;
 mod single_operation;
-mod string;
 mod variable;
 
-use parser::fst::Expression;
+use ast::Expression;
 
 use self::{
     call::interpret_call, get::interpret_get, list::interpret_list, literal::interpret_literal,
@@ -31,5 +30,6 @@ pub fn interpret_expression(expression: &Expression, state: &ProgramState) -> Va
         Expression::Get(value, index) => interpret_get((&value, &index), state),
         Expression::Block(statements) => interpret_code_block(statements, state, vec![]).0,
         Expression::Object(..) => todo!(),
+        Expression::Infer => todo!(),
     }
 }

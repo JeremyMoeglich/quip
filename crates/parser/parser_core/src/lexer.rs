@@ -147,11 +147,10 @@ pub enum Token<'a> {
     BlockComment(&'a str),
 
     // Whitespace
-    #[regex(r"( |\n|\t)*")]
+    #[regex("[ \r\n\t]+")]
     Space(&'a str),
 
     EOF,
-
     Error,
 }
 

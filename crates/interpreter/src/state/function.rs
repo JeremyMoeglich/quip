@@ -1,6 +1,9 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::{interpreter::code_block::interpret_code_block, parser::fst::CodeBlock};
+
+use ast::CodeBlock;
+
+use crate::code_block::interpret_code_block;
 
 use super::{program_state::ProgramState, value_ref::ValueRef};
 

@@ -3,12 +3,12 @@ use std::{
     rc::Rc,
 };
 
+use ast::{Operator, SingleOperation};
 use num::ToPrimitive;
 
-use crate::{
-    interpreter::access::interpret_access,
-    parser::fst::{Operator, SingleOperation},
-};
+
+
+use crate::access::interpret_access;
 
 use super::value::value::Value;
 

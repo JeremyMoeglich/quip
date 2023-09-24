@@ -6,6 +6,8 @@ pub mod state;
 mod statement;
 
 
+use ast::CodeBlock;
+
 use self::{
     code_block::interpret_code_block,
     native_functions::NATIVE_FUNCTIONS,

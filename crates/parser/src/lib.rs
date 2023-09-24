@@ -17,6 +17,12 @@ pub mod core {
     pub use parser_core::*;
 }
 
+pub fn parse_file<'a>(input: &Span<'a>) -> ParserResult<'a, CodeBlock> {
+    let (input, out) = aggressive_many0(parse_statement)(input)?;
+    let (input, _) = ws0(&input)?;
+    Ok((input, CodeBlock { statements: out }))
+}
+
 pub fn parse_code<'a>(input: &Span<'a>) -> ParserResult<'a, CodeBlock> {
     let (input, out) = many0(parse_statement)(input)?;
     let (input, _) = ws0(&input)?;
@@ -26,7 +32,7 @@ pub fn parse_code<'a>(input: &Span<'a>) -> ParserResult<'a, CodeBlock> {
 pub fn simple_parse(code: &str) -> Result<CodeBlock, String> {
     let tokens = tokenize(code);
     let input = create_span(&tokens);
-    let result = parse_code(&input);
+    let result = parse_file(&input);
     match result {
         Ok((input2, expression)) => match input2.tokens.len() {
             0 => Ok(expression),

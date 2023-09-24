@@ -7,15 +7,110 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'lang_impl'",
+            "name": "Debug unit tests in library 'parser'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=parser"
+                ],
+                "filter": {
+                    "name": "parser",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'ast'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=ast"
+                ],
+                "filter": {
+                    "name": "ast",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'parser-core'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=parser-core"
+                ],
+                "filter": {
+                    "name": "parser-core",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'interpreter'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=interpreter"
+                ],
+                "filter": {
+                    "name": "interpreter",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'quip'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=quip"
+                ],
+                "filter": {
+                    "name": "quip",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'quip'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=lang_impl",
-                    "--package=lang_impl"
+                    "--bin=quip",
+                    "--package=quip"
                 ],
                 "filter": {
-                    "name": "lang_impl",
+                    "name": "quip",
                     "kind": "bin"
                 }
             },
@@ -25,16 +120,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'lang_impl'",
+            "name": "Debug unit tests in executable 'quip'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=lang_impl",
-                    "--package=lang_impl"
+                    "--bin=quip",
+                    "--package=quip"
                 ],
                 "filter": {
-                    "name": "lang_impl",
+                    "name": "quip",
                     "kind": "bin"
                 }
             },

@@ -1,11 +1,4 @@
-// 1. Example of quip syntax
-
-//env console; // env is not implemented yet
-
-println("Hello World");
-
-fn test() {
-    let x = 1;
+let x = 1;
     let y = 2;
     let mut z = 3;
 
@@ -22,7 +15,6 @@ fn test() {
 
     println("x = {x}, y = {y}, z = {z}");
     println("p = {p}, t = {t}");
-}
 
 test();
 

@@ -1,7 +1,7 @@
 #![feature(return_position_impl_trait_in_trait)]
 pub mod lexer;
-pub use lexer::*;
 use ast::Location;
+pub use lexer::*;
 mod error_union;
 use logos::Logos;
 use proc_macros::{generate_all_alt_impls, generate_all_tuple_impls};
@@ -36,6 +36,9 @@ pub fn tokenize<'a>(source: &'a str) -> Vec<LocatedToken<'a>> {
     };
     while let Some(token) = iter.next() {
         let token = token.unwrap_or(Token::Error);
+        if let Token::Error = token {
+            println!("Error at {:?} {:?}", iter.span(), &source[iter.span()]);
+        }
         let range = iter.span();
         let text = &source[range];
         let new_lines = text.chars().filter(|c| *c == '\n').count();
@@ -121,7 +124,7 @@ impl ParserError {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 #[error("{error} at {location}")]
 pub struct LocatedParserError {
     pub error: ParserError,
@@ -155,6 +158,34 @@ impl LocatedParserError {
             (_, EndOfInput) => false,
             (UnexpectedToken(_, _), _) => true,
             (_, UnexpectedToken(_, _)) => false,
+        }
+    }
+
+    pub fn accumulate(&self, other: Self) -> Self {
+        if other.better_than(self) {
+            other
+        } else if self.location == other.location {
+            match (self.error.clone(), other.error.clone()) {
+                (
+                    ParserError::UnexpectedToken(got1, expected1),
+                    ParserError::UnexpectedToken(got2, expected2),
+                ) => {
+                    if got1 != got2 {
+                        unreachable!(
+                            "Got two different tokens at the same location: {:?} {:?} at {}",
+                            got1, got2, other.location
+                        )
+                    }
+                    ParserError::UnexpectedToken(
+                        got1,
+                        expected1.iter().chain(expected2.iter()).cloned().collect(),
+                    )
+                    .locate(other.location)
+                }
+                _ => self.clone(),
+            }
+        } else {
+            self.clone()
         }
     }
 }
@@ -295,6 +326,30 @@ pub fn many0<'a, O>(
     }
 }
 
+pub fn aggressive_many0<'a, O>(
+    parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
+) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {
+    move |input: &Span<'a>| {
+        let mut input = input.clone();
+        let mut output = vec![];
+        loop {
+            match parser(&input) {
+                Ok((rest, o)) => {
+                    input = rest;
+                    output.push(o);
+                }
+                Err(e) => {
+                    if input.tokens.len() != 0 {
+                        return Err(e);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok((input, output))
+    }
+}
 pub fn many1<'a, O>(
     parser: impl Fn(&Span<'a>) -> ParserResult<'a, O>,
 ) -> impl Fn(&Span<'a>) -> ParserResult<'a, Vec<O>> {

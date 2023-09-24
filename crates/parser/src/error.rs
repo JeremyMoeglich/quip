@@ -76,5 +76,5 @@ pub fn create_fancy_error(original: &str, err: LocatedParserError) -> String {
 
     let marked = mark_code(original, err.location, padding);
 
-    format!("{}{}", err, marked)
+    format!("{}\n{}", err, marked)
 }

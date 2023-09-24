@@ -39,29 +39,7 @@ pub fn vec_alt<'a, O, F: Fn(&Span<'a>) -> ParserResult<'a, O>>(
             match result {
                 Ok((input, value)) => return Ok((input, value)),
                 Err(e) => {
-                    if e.better_than(&best_error) {
-                        best_error = e;
-                    } else if e.location == best_error.location {
-                        match (e.error, best_error.error.clone()) {
-                            (
-                                ParserError::UnexpectedToken(got1, expected1),
-                                ParserError::UnexpectedToken(got2, expected2),
-                            ) => {
-                                if got1 != got2 {
-                                    unreachable!(
-                                        "Got two different tokens at the same location: {:?} {:?} at {}",
-                                        got1, got2, e.location
-                                    )
-                                }
-                                best_error = ParserError::UnexpectedToken(
-                                    got1,
-                                    expected1.iter().chain(expected2.iter()).cloned().collect(),
-                                )
-                                .locate(e.location);
-                            }
-                            _ => {}
-                        }
-                    }
+                    best_error = best_error.accumulate(e);
                 }
             }
         }

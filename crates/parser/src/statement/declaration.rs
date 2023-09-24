@@ -24,7 +24,7 @@ pub fn parse_declaration<'a>(input: &Span<'a>) -> ParserResult<'a, StatementInne
     let (input, _) = ws0(&input)?;
 
     let (input, expression_opt) =
-        opt((parse_Equal, ws0, parse_expression).tuple()).map(|v| match v {
+        opt((parse_Assign, ws0, parse_expression).tuple()).map(|v| match v {
             Some((_, _, expression)) => Some(expression),
             None => None,
         })(&input)?;

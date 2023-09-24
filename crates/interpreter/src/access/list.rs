@@ -1,4 +1,4 @@
-use crate::interpreter::state::{value::value::Value, value_ref::ValueRef};
+use crate::state::{value::value::Value, value_ref::ValueRef};
 
 use super::access_error::access_error;
 
