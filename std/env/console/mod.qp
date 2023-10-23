@@ -1,0 +1,28 @@
+
+import std.lang.rust.{rust_std, rs};
+#[requires_env(console)]
+pub fn println(value: String) {
+    rust_std.io.println("{}", value)!;
+}
+
+#[requires_env(console)]
+pub fn input(prompt: String) -> Result(String, _) {
+    rs {
+        print!("{}", prompt);
+        std::io::stdout().flush()?;
+
+        let mut buffer = String::new();
+        std::io::stdin().read_line(&mut buffer)?;
+        
+        if buffer.ends_with('\n') {
+            buffer.pop();
+            if buffer.ends_with('\r') {
+                buffer.pop();
+            }
+        }
+
+        buffer
+    }!
+}
+
+pub unsafe trait console {};

@@ -1,8 +1,8 @@
 let x = 1;
-    let y = 2;
-    let mut z = 3;
+let y = 2;
+let mut z = 3;
 
-    let p = {
+let p = {
         let a = 1;
         let b = 2;
         let c = 3;

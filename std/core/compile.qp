@@ -1,0 +1,5 @@
+
+#[static, cte]
+pub fn compile(file: File) {
+    -
+}

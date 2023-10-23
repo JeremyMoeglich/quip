@@ -1,0 +1,30 @@
+import std.lang.c.cimport;
+import cimport(_:Dynamic("libc.so"), "stdio.h").* as stdio;
+
+struct File {
+    fd: i32,
+}
+
+impl File {
+    pub fn open(path: &str) -> File {
+        let fd = unsafe {
+            stdio.fopen(path, "r")
+        };
+        File {
+            fd: fd,
+        }
+    }
+    pub fn read(&self) -> String {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let len = unsafe {
+            stdio.fread(buf, 1, 1024, self.fd)
+        };
+        let mut s = String::new();
+        for i in 0..len {
+            s.push(buf[i] as char);
+        }
+        s
+    }
+}
+
+pub unsafe trait fs {};
