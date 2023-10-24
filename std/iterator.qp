@@ -1,0 +1,17 @@
+trait Iterator<T> {
+    fn next(&mut self) -> Future<Option<T>>;
+}
+
+struct Range {
+    start: Int,
+    end: Int,
+}
+
+impl Coerce<RangeIterator> for Range {
+    fn coerce(self) -> RangeIterator {
+        RangeIterator {
+            range: self,
+            current: self.start,
+        }
+    }
+}

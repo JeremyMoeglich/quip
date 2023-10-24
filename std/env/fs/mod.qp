@@ -1,30 +1,81 @@
 import std.lang.c.cimport;
 import cimport(_:Dynamic("libc.so"), "stdio.h").* as stdio;
+import std.mem.uninitialized;
 
 struct File {
     fd: i32,
 }
 
+#[requires_env(fs)]
 impl File {
-    pub fn open(path: &str) -> File {
+    pub fn open(path: &str) -> Result(File, String) {
         let fd = unsafe {
-            stdio.fopen(path, "r")
+            stdio.open(path, stdio.O_RDONLY)
         };
-        File {
+        if fd < 0 {
+            return Err("Failed to open file");
+        }
+        Ok(File {
             fd: fd,
-        }
+        })
     }
-    pub fn read(&self) -> String {
-        let mut buf: [u8; 1024] = [0; 1024];
-        let len = unsafe {
-            stdio.fread(buf, 1, 1024, self.fd)
+    pub fn read(&self) -> Result(String, String) {
+        let size = self.metadata()?.size;
+        let ptr = unsafe {
+            std.mem.malloc(size)
         };
-        let mut s = String::new();
-        for i in 0..len {
-            s.push(buf[i] as char);
+        let res = unsafe {
+            stdio.read(self.fd, ptr, size)
+        };
+        if res < 0 {
+            return Err("Failed to read file");
         }
-        s
+        let string = res.to_utf8_string();
+        unsafe {
+            std.mem.free(ptr)
+        };
+        Ok(string)
     }
+    pub fn metadata(&self) -> Result(Metadata, String) {
+        let mut file_stat: stdio.stat = unsafe { std.mem.uninitialized() };
+        let res = unsafe {
+            stdio.fstat(self.fd, &mut file_stat)
+        };
+        if res < 0 {
+            return Err("Failed to stat file");
+        }
+        Ok(Metadata {
+            device_id: file_stat.st_dev,
+            inode: file_stat.st_ino,
+            mode: file_stat.st_mode,
+            hard_links: file_stat.st_nlink,
+            user_id: file_stat.st_uid,
+            group_id: file_stat.st_gid,
+            special_device_id: file_stat.st_rdev,
+            size: file_stat.st_size,
+            block_size: file_stat.st_blksize,
+            block_amount: file_stat.st_blocks,
+            last_access_time: file_stat.st_atime,
+            last_change_time: file_stat.st_ctime,
+            last_status_change_time: file_stat.st_mtime,
+        })
+    }
+}
+
+pub struct Metadata {
+    device_id: u64,
+    inode: u64,
+    mode: u32,
+    hard_links: u32,
+    user_id: u32,
+    group_id: u32,
+    special_device_id: u64,
+    size: u64,
+    block_size: u64,
+    block_amount: u64,
+    last_access_time: u64,
+    last_change_time: u64,
+    last_status_change_time: u64,
 }
 
 pub unsafe trait fs {};
