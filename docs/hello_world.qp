@@ -1,0 +1,19 @@
+import ./lib.docref;
+
+pub let name = "Hello World!";
+pub let next = [
+    "Variables in Quip",
+]
+
+pub let ui = {
+    subs: [
+        box { subs: [
+                "Welcome to Quip!",
+                "This is the guide to Quip. It will teach you the basics of the language.",
+                "If you haven't yet installed Quip checkout { docref("Install") }.",
+        ] },
+        box { subs: [
+                
+        ] },
+    ]
+}

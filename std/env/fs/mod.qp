@@ -1,6 +1,7 @@
 import std.lang.c.cimport;
 import cimport(_:Dynamic("libc.so"), "stdio.h").* as stdio;
-import std.mem.uninitialized;
+import std.mem.buffer;
+import std.error;
 
 struct File {
     fd: i32,
@@ -8,41 +9,36 @@ struct File {
 
 #requires_env(fs)
 impl File {
-    pub fn open(path: String) -> Result(File, String) {
+    pub fn open(path: &str) -> Result(File, String) {
         let fd = unsafe {
             stdio.open(path, stdio.O_RDONLY)
         };
         if fd < 0 {
-            return Err("Failed to open file");
+            return Err(error("FileOpenError", "Failed to open file"));
         }
         Ok(File {
             fd: fd,
         })
     }
-    pub fn read(&self) -> Result(String, String) {
+    pub fn read(&self) -> Result(String, _) {
         let size = self.metadata()?.size;
-        let ptr = unsafe {
-            std.mem.malloc(size)
-        };
+        let buf = buffer(size);
         let res = unsafe {
-            stdio.read(self.fd, ptr, size)
+            stdio.read(self.fd, buf.start, size)
         };
         if res < 0 {
-            return Err("Failed to read file");
+            return Err(error("FileReadError", "Failed to read file"));
         }
         let string = res.to_utf8_string();
-        unsafe {
-            std.mem.free(ptr)
-        };
         Ok(string)
     }
-    pub fn metadata(&self) -> Result(Metadata, String) {
+    pub fn metadata(&self) -> Result(Metadata, _) {
         let mut file_stat: stdio.stat = unsafe { std.mem.uninitialized() };
         let res = unsafe {
             stdio.fstat(self.fd, &mut file_stat)
         };
         if res < 0 {
-            return Err("Failed to stat file");
+            return Err(error("FileMetadataError", "Failed to get file metadata"));
         }
         Ok(Metadata {
             device_id: file_stat.st_dev,

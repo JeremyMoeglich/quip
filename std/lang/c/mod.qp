@@ -1,0 +1,11 @@
+pub enum LinkingMethod {
+    Dynamic(String),
+    Static(String)
+}
+
+
+#[cte]
+pub fn cimport(linking_method: LinkingMethod, header: String) -> Module {
+    let header = parse_c_header(find_file(header)*.read_to_string()*)*;
+
+}

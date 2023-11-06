@@ -1,0 +1,38 @@
+import std.env.ui.Ui;
+
+let DocName = docs.map(|doc| Const(doc.name)).as_union();
+let doc = _ {
+    export: {
+        name: String,
+        ui: Ui,
+        next: DocName[]
+    }
+}
+
+import ./* as docs using doc;
+const { assert(docs.map(|doc| doc.name).are_unique()) };
+
+pub let ui = box {
+    subs: [
+        text { text: "Docs", size: 20px },
+        box {
+            subs: docs.map(|doc| link {
+                subs: [
+                    text { text: doc.name, size: 16px },
+                    text { text: doc.filename, size: 12px }
+                ],
+                path: doc.path
+            })
+        }
+    ]
+}
+
+pub fn docref(name: DocName) -> _ {
+    let doc = docs.find(|doc| doc.name == name);
+    link {
+        subs: [
+            text { text: doc.name, size: 16px },
+        ],
+        path: doc.path
+    }
+}
