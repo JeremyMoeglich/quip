@@ -6,9 +6,9 @@ struct File {
     fd: i32,
 }
 
-#[requires_env(fs)]
+#requires_env(fs)
 impl File {
-    pub fn open(path: &str) -> Result(File, String) {
+    pub fn open(path: String) -> Result(File, String) {
         let fd = unsafe {
             stdio.open(path, stdio.O_RDONLY)
         };

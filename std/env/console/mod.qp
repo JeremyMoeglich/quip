@@ -1,11 +1,12 @@
 
 import std.lang.rust.{rust_std, rs};
-#[requires_env(console)]
+
+#requires_env(console)
 pub fn println(value: String) {
     rust_std.io.println("{}", value)!;
 }
 
-#[requires_env(console)]
+#requires_env(console)
 pub fn input(prompt: String) -> Result(String, _) {
     rs {
         print!("{}", prompt);
