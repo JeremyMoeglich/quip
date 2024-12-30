@@ -11,11 +11,10 @@ proc-macro = true
 num = "0.4.0"
 lazy_static = "1.4.0"
 pad = "0.1.6"
-logos = "0.13.0"
 oom = "0.3.0"
 thiserror = "1.0.40"
 enum-kinds = "0.5.1"
-syn = { version = "2.0.33", features = ["visit-mut"]}
+syn = { version = "2.0.77", features = ["visit-mut"]}
 proc-macro2 = "1.0.67"
 quote = "1.0.33"
 

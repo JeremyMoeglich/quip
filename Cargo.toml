@@ -6,19 +6,35 @@ edition = "2021"
 
 [dependencies]
 derivative = "2.2.0"
-enum-kinds = "0.5.1"
 lazy_static = "1.4.0"
-logos = "0.13.0"
 parser = { path = "crates/parser" }
-interpreter = { path = "crates/interpreter" }
 pretty_assertions = "1.4.0"
 
 [workspace]
 members = [
     "crates/parser",
+    "crates/printer",
     "crates/parser/parser_core",
     "crates/proc_macros",
-    "crates/interpreter",
-    "crates/ast",
-    "."
+    "crates/fst",
+    "crates/format",
+    "crates/scripts",
+    ".",
+    "crates/things",
 ]
+
+
+[profile.release]
+lto = "fat"
+opt-level = 3
+debug = true
+debug-assertions = true
+
+[profile.dev]
+lto = "off"
+opt-level = 0
+debug = true
+
+
+[features]
+parser_log = ["parser/log"]

@@ -1,39 +1,25 @@
 #![allow(dead_code)]
 
-use ast::{Comment, Location};
+use fst::Location;
+use enumset::EnumSet;
 use parser_core::*;
+
+pub use crate::whitespace::*;
 
 // Utils for parsing
 
-pub fn ws1<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
-    let (input, whitespace) = many1(
-        (
-            parse_LineComment.map(|v| Some(Comment::Line(v.to_string()))),
-            parse_Space.map(|_| None),
-            parse_BlockComment.map(|v| Some(Comment::Block(v.to_string()))),
-        )
-            .alt(),
-    )(input)?;
-    Ok((input, whitespace.iter().filter_map(|v| v.clone()).collect()))
-}
-
-pub fn ws0<'a>(input: &Span<'a>) -> ParserResult<'a, Vec<Comment>> {
-    let (input, whitespace) = many0(
-        (
-            parse_LineComment.map(|v| Some(Comment::Line(v.to_string()))),
-            parse_Space.map(|_| None),
-            parse_BlockComment.map(|v| Some(Comment::Block(v.to_string()))),
-        )
-            .alt(),
-    )(input)?;
-    Ok((input, whitespace.iter().filter_map(|v| v.clone()).collect()))
-}
-
-pub fn vec_alt<'a, O, F: Fn(&Span<'a>) -> ParserResult<'a, O>>(
+#[inline]
+pub fn vec_alt<'a, O, F: Fn(Span<'a>) -> ParserResult<'a, O>>(
     parsers: Vec<F>,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, O> {
+) -> impl Fn(Span<'a>) -> ParserResult<'a, O> {
+    debug_assert!(parsers.len() > 0);
     move |input| {
-        let mut best_error = ParserError::InactiveParser.locate(input.start);
+        let source_span = input.first_token_span();
+        let mut best_error = match input.tokens.get(0) {
+            Some(token) => ParserError::UnexpectedToken(Some(token.kind()), EnumSet::empty())
+                .locate(source_span),
+            None => ParserError::UnexpectedToken(None, EnumSet::empty()).locate(source_span),
+        };
         for parser in parsers.iter() {
             let result = parser(input);
             match result {
@@ -47,18 +33,7 @@ pub fn vec_alt<'a, O, F: Fn(&Span<'a>) -> ParserResult<'a, O>>(
     }
 }
 
-pub fn ws_delimited<'a, O, F>(parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>
-where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
-{
-    move |input| {
-        let (input, _) = ws0(input)?;
-        let (input, value) = parser(&input)?;
-        let (input, _) = ws0(&input)?;
-        Ok((input, value))
-    }
-}
-
+#[inline]
 pub fn vec_tuple<'a, O, F, E>(parsers: Vec<F>) -> impl Fn(Span<'a>) -> ParserResult<Vec<O>>
 where
     F: Fn(Span<'a>) -> ParserResult<O>,
@@ -79,44 +54,29 @@ where
     }
 }
 
-pub fn acond<'a, O, F>(boolean: bool, parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, O>
+#[inline]
+pub fn opt<'a, O, F>(parser: F) -> impl Fn(Span<'a>) -> SafeParserResult<'a, Option<O>>
 where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
-{
-    move |input| match boolean {
-        true => parser(input),
-        false => Err(ParserError::InactiveParser.locate(input.start)),
-    }
-}
-
-pub fn opt<'a, O, F>(parser: F) -> impl Fn(&Span<'a>) -> ParserResult<'a, Option<O>>
-where
-    F: Fn(&Span<'a>) -> ParserResult<'a, O>,
+    F: Fn(Span<'a>) -> ParserResult<'a, O>,
 {
     move |input| match parser(input) {
-        Ok((input, value)) => Ok((input, Some(value))),
-        Err(_) => Ok((input.clone(), None)),
+        Ok((input, value)) => (input, Some(value)),
+        Err(_) => (input, None),
     }
 }
 
-pub fn separated_pair<'a, O1, O2, O3, F1, F2, F3>(
-    parser1: F1,
-    parser2: F2,
-    parser3: F3,
-) -> impl Fn(&Span<'a>) -> ParserResult<'a, (O1, O3)>
+#[inline]
+pub fn opt_bool<'a, O, F>(parser: F) -> impl Fn(Span<'a>) -> SafeParserResult<'a, bool>
 where
-    F1: Fn(&Span<'a>) -> ParserResult<'a, O1>,
-    F2: Fn(&Span<'a>) -> ParserResult<'a, O2>,
-    F3: Fn(&Span<'a>) -> ParserResult<'a, O3>,
+    F: Fn(Span<'a>) -> ParserResult<'a, O>,
 {
-    move |input| {
-        let (input, value1) = parser1(input)?;
-        let (input, _) = parser2(&input)?;
-        let (input, value2) = parser3(&input)?;
-        Ok((input, (value1, value2)))
+    move |input| match parser(input) {
+        Ok((input, _)) => (input, true),
+        Err(_) => (input, false),
     }
 }
 
+#[inline]
 pub fn locate(text: &str, index: usize) -> Location {
     let mut line = 0;
     let mut column = 0;
@@ -142,10 +102,35 @@ pub trait ParseString<O> {
     fn parse_string<'a>(&self, input: &'a str) -> ParserOutput<O>;
 }
 
-impl<O, F: for<'a> Fn(&Span<'a>) -> ParserResult<'a, O>> ParseString<O> for F {
+impl<O, F: for<'a> Fn(Span<'a>) -> ParserResult<'a, O>> ParseString<O> for F {
     fn parse_string<'b>(&self, input: &'b str) -> ParserOutput<O> {
         let tokens = tokenize(input);
         let input = create_span(&tokens);
-        self(&input).to_output()
+        self(input).to_output()
     }
-} 
+}
+
+#[inline]
+pub fn token_branch<'a, T>(
+    values: &'a [T],
+    get_kind: impl Fn(&T) -> TokenKind,
+) -> impl Fn(Span<'a>) -> ParserResult<'a, &T> {
+    let expected_tokens = values.iter().map(|op| get_kind(op)).collect();
+    move |input| {
+        let (input, (token, source_span)) = input.take_token();
+        match token {
+            Some(token) => {
+                let value = values.iter().find(|op| get_kind(op) == token.kind());
+                debug_assert!(token.source_span == source_span);
+                match value {
+                    Some(value) => Ok((input, value)),
+                    None => Err(
+                        ParserError::UnexpectedToken(Some(token.kind()), expected_tokens)
+                            .locate(token.source_span),
+                    ),
+                }
+            }
+            None => Err(ParserError::UnexpectedToken(None, expected_tokens).locate(source_span)),
+        }
+    }
+}

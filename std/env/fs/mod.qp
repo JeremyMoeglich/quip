@@ -74,4 +74,4 @@ pub struct Metadata {
     last_status_change_time: u64,
 }
 
-pub unsafe trait fs {};
+pub unsafe trait Fs {};

@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::visit_mut::VisitMut;
-use syn::{parse_macro_input, Generics, LitInt};
+use syn::{parse_macro_input, LitInt};
 use syn::{Data, DataEnum, DeriveInput, Fields, Ident};
 
 #[proc_macro]
@@ -20,18 +20,22 @@ pub fn generate_all_tuple_impls(input: TokenStream) -> TokenStream {
             .collect::<Vec<_>>();
 
         let fn_names = (0..i)
-            .map(|j| Ident::new(&format!("F{}", j), Span::call_site()))
+            .map(|j| Ident::new(&format!("f{}", j), Span::call_site()))
             .collect::<Vec<_>>();
 
-        let indices = (0..i).collect::<Vec<_>>();
+        let into_result_names = (0..i)
+            .map(|j| Ident::new(&format!("I{}", j), Span::call_site()))
+            .collect::<Vec<_>>();
+
+        let indices = (0..i).map(|i| syn::Index::from(i)).collect::<Vec<_>>();
 
         let tokens = quote! {
-            impl<'a, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, #type_names>),* , #(#type_names,)*> Tuple<'a, (#(#type_names,)*)> for (#(#fn_names,)*) {
-                fn tuple<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, (#(#type_names,)*)> + 'b {
-                    move |input: &Span<'a>| {
-                        let mut input = input.clone();
+            impl<'a, #(#fn_names: Fn(Span<'a>) -> #into_result_names),* , #(#type_names),* , #(#into_result_names: IntoParserResult<'a, #type_names>),* > Tuple<'a, (#(#type_names,)*)> for (#(#fn_names,)*) {
+                #[inline]
+                fn tuple<'b>(&'b self) -> impl Fn(Span<'a>) -> ParserResult<'a, (#(#type_names,)*)> + 'b {
+                    move |mut input: Span<'a>| {
                         #(
-                            let (rest, #fn_names) = self.#indices(&input)?;
+                            let (rest, #fn_names) = self.#indices(input).into_parser_result()?;
                             input = rest;
                         )*
                         Ok((input, (#(#fn_names,)*)))
@@ -57,25 +61,28 @@ pub fn generate_all_alt_impls(input: TokenStream) -> TokenStream {
 
     for i in 1..=n {
         let fn_names = (0..i)
-            .map(|j| Ident::new(&format!("F{}", j), Span::call_site()))
+            .map(|j| Ident::new(&format!("f{}", j), Span::call_site()))
             .collect::<Vec<_>>();
 
-        let indices = (0..i).collect::<Vec<_>>();
+        let into_result_names = (0..i)
+            .map(|j| Ident::new(&format!("I{}", j), Span::call_site()))
+            .collect::<Vec<_>>();
+
+        let indices = (0..i).map(|i| syn::Index::from(i)).collect::<Vec<_>>();
 
         let tokens = quote! {
-            impl<'a, Out, #(#fn_names: Fn(&Span<'a>) -> ParserResult<'a, Out>),*> Alt<'a, Out> for (#(#fn_names,)*) {
-                fn alt<'b>(&'b self) -> impl Fn(&Span<'a>) -> ParserResult<'a, Out> + 'b {
-                    move |input: &Span<'a>| {
+            impl<'a, Out, #(#fn_names: Fn(Span<'a>) -> #into_result_names),*, #(#into_result_names: IntoParserResult<'a, Out>),* > Alt<'a, Out> for (#(#fn_names,)*) {
+                #[inline]
+                fn alt<'b>(&'b self) -> impl Fn(Span<'a>) -> ParserResult<'a, Out> + 'b {
+                    move |input: Span<'a>| {
                         let mut err = None;
                         #(
-                            match self.#indices(input) {
+                            match self.#indices(input).into_parser_result() {
                                 Ok(res) => return Ok(res),
                                 Err(e) => {
-                                    if err.is_none() {
-                                        err = match err {
-                                            None => Some(e),
-                                            Some(last) => Some(last.accumulate(e)), 
-                                        }
+                                    err = match err {
+                                        None => Some(e),
+                                        Some(last) => Some(last.accumulate(e)),
                                     }
                                 }
                             }
@@ -106,28 +113,22 @@ impl syn::visit_mut::VisitMut for ReplaceLifetime {
 pub fn token_parser(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let enum_name = &input.ident;
-    let Generics { params, .. } = input.generics;
     let mut parser_fns = quote! {};
 
     if let Data::Enum(DataEnum { variants, .. }) = input.data {
         for variant in variants {
             let variant_name = &variant.ident;
+            let fn_name = format_ident!("parse_{}", to_snake_case(&variant_name.to_string()));
             match variant.fields {
                 Fields::Unit => {
                     // Generate the parser for no-data variants
-                    let fn_name = format_ident!("parse_{}", variant_name);
                     let nodata_parser = quote! {
-                        pub fn #fn_name<'token_parser_a, 'token_parser_b>(input: &'token_parser_b Span<'token_parser_a>) -> ParserResult<'token_parser_a, ()> {
-                            let start = input.start;
-                            let (input, first_span) = input.take_n_token(1)?;
-                            let first = &first_span.tokens[0];
-                            match first.token {
-                                Token::#variant_name => Ok((input, ())),
-                                _ => Err(crate::ParserError::UnexpectedToken(
-                                    first.kind(),
-                                    vec![TokenKind::#variant_name],
-                                ).locate(start)),
+                        #[inline]
+                        pub fn #fn_name<'token_parser_a>(input: Span<'token_parser_a>) -> ParserResult<'token_parser_a, ()> {
+                            let (input, (token, source_span)) = input.take_token();
+                            match token.delocate() {
+                                Some(Token::#variant_name) => Ok((input, ())),
+                                _ => Err(token.as_parser_error(TokenKind::#variant_name.into(), source_span)),
                             }
                         }
                     };
@@ -137,23 +138,13 @@ pub fn token_parser(input: TokenStream) -> TokenStream {
                     // Generate the parser for data variants
                     let mut data_type = fields.unnamed.first().unwrap().ty.clone();
                     ReplaceLifetime.visit_type_mut(&mut data_type);
-                    let fn_name = format_ident!("parse_{}", variant_name);
-                    let clone_types = vec!["Number"];
-                    let (clone_ref, data_quote) = match clone_types.contains(&variant_name.to_string().as_str()) {
-                        true => (quote! { & }, quote! { data.clone() }),
-                        false => (quote! {}, quote! { data }),
-                    };
                     let data_parser = quote! {
-                        pub fn #fn_name<'token_parser_a, 'token_parser_b>(input: &'token_parser_b Span<'token_parser_a>) -> ParserResult<'token_parser_a, #data_type> {
-                            let start = input.start;
-                            let (input, first_span) = input.take_n_token(1)?;
-                            let first = &first_span.tokens[0];
-                            match #clone_ref first.token {
-                                Token::#variant_name(data) => Ok((input, #data_quote)),
-                                _ => Err(crate::ParserError::UnexpectedToken(
-                                    first.kind(),
-                                    vec![TokenKind::#variant_name],
-                                ).locate(start)),
+                        #[inline]
+                        pub fn #fn_name<'token_parser_a>(input: Span<'token_parser_a>) -> ParserResult<'token_parser_a, #data_type> {
+                            let (input, (token, source_span)) = input.take_token();
+                            match token.delocate() {
+                                Some(Token::#variant_name(data)) => Ok((input, data)),
+                                _ => Err(token.as_parser_error(TokenKind::#variant_name.into(), source_span)),
                             }
                         }
                     };
@@ -167,4 +158,23 @@ pub fn token_parser(input: TokenStream) -> TokenStream {
     }
 
     parser_fns.into()
+}
+
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c.is_uppercase() {
+            if !result.is_empty()
+                && result.chars().last().unwrap() != '_'
+                && chars.peek().map_or(false, |next| next.is_lowercase())
+            {
+                result.push('_');
+            }
+            result.push(c.to_lowercase().next().unwrap());
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }

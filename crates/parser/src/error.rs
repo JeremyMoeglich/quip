@@ -1,9 +1,13 @@
-use ast::Location;
+use fst::Location;
 use pad::{Alignment, PadStr};
 use parser_core::LocatedParserError;
 
+fn lines(text: &str) -> impl Iterator<Item = &str> {
+    text.split('\n')
+}
+
 fn add_line_numbers(text: &str, to_map_locations: Vec<Location>) -> (String, Vec<Location>) {
-    let max_line_number_width = text.lines().count().to_string().len();
+    let max_line_number_width = lines(text).count().to_string().len();
 
     let get_line_prefix = |line_number| {
         format!("{} | ", line_number)
@@ -15,8 +19,7 @@ fn add_line_numbers(text: &str, to_map_locations: Vec<Location>) -> (String, Vec
         format!("{}{}", prefix, line)
     };
 
-    let new_text = text
-        .lines()
+    let new_text = lines(text)
         .enumerate()
         .map(|(i, line)| format_line(line, i + 1))
         .collect::<Vec<_>>()
@@ -46,7 +49,7 @@ fn mark_code(text: &str, location: Location, padding: usize) -> String {
     // mark a line of code with a ^ at the start of the error and show the nearest {padding} lines
     let (text, location) = add_line_numbers_single(text, location);
 
-    let lines = text.lines().collect::<Vec<&str>>();
+    let lines = lines(&text).collect::<Vec<&str>>();
 
     let start_line = if location.line > padding {
         location.line - padding
@@ -74,7 +77,7 @@ fn mark_code(text: &str, location: Location, padding: usize) -> String {
 pub fn create_fancy_error(original: &str, err: LocatedParserError) -> String {
     let padding = 2;
 
-    let marked = mark_code(original, err.location, padding);
+    let marked = mark_code(original, err.source_span.start, padding);
 
     format!("{}\n{}", err, marked)
 }

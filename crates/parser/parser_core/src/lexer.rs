@@ -1,33 +1,30 @@
-use enum_kinds::EnumKind;
-use logos::{internal::LexerInternal, Lexer, Logos};
-use num::{BigInt, Num};
-use proc_macros::TokenParser;
-use std::str::FromStr;
 use crate::*;
+use enum_kinds::EnumKind;
+use enumset::EnumSetType;
+use logos::{internal::LexerInternal, Lexer, Logos};
+use proc_macros::TokenParser;
 
-use ast::Number;
 
-#[derive(Logos, Debug, PartialEq, Clone, EnumKind, TokenParser)]
-#[enum_kind(TokenKind)]
+#[derive(Logos, Debug, PartialEq, Clone, Copy, EnumKind, TokenParser)]
+#[enum_kind(TokenKind, derive(EnumSetType), enumset(no_super_impls))]
 pub enum Token<'a> {
     // Identifiers
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Ident(&'a str),
 
     // literals
-    #[regex(
-        r"0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?",
-        number
-    )]
-    Number(Number),
+    #[regex(r"0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")]
+    Number(&'a str),
 
     // strings can use ' or "
-    #[regex(r#""([^"\\]|\\.)*""#)]
-    DoubleQuoteString(&'a str),
-    #[regex(r#"'([^'\\]|\\.)*'"#)]
-    SingleQuoteString(&'a str),
+    #[regex(r#""([^"\\]|\\.)*"|'([^'\\]|\\.)*'"#)]
+    String(&'a str),
     #[regex("r#", raw_string_start)]
     RawString(&'a str),
+
+    // labels
+    #[regex("'[a-zA-Z_][a-zA-Z0-9_]*")]
+    Label(&'a str),
 
     #[token("true|false", |lex| {
         if lex.slice() == "true" {
@@ -65,6 +62,10 @@ pub enum Token<'a> {
     Modulo,
     #[token("**")]
     Power,
+    #[token("|>")]
+    Pipe,
+    #[token("^")]
+    Caret,
 
     // operators that can be used as a prefix, postfix, or inbetween
     #[token("+")]
@@ -73,6 +74,12 @@ pub enum Token<'a> {
     Minus,
     #[token("*")]
     Star,
+    #[token("+%")]
+    PlusPercent,
+    #[token("-%")]
+    MinusPercent,
+    #[token("*%")]
+    StarPercent,
     #[token("!")]
     Exclamation,
     #[token("?")]
@@ -100,7 +107,7 @@ pub enum Token<'a> {
     #[token("}")]
     RightBrace,
     #[token("=")]
-    Assign,
+    Assignment,
     #[token("->")]
     Arrow,
     #[token("|")]
@@ -119,6 +126,8 @@ pub enum Token<'a> {
     While,
     #[token("for")]
     For,
+    #[token("loop")]
+    Loop,
     #[token("in")]
     In,
     #[token("break")]
@@ -133,12 +142,24 @@ pub enum Token<'a> {
     Enum,
     #[token("impl")]
     Impl,
+    #[token("trait")]
+    Trait,
+    #[token("mod")]
+    Mod,
     #[token("type")]
     Type,
     #[token("fn")]
     Fn,
     #[token("mut")]
     Mut,
+    #[token("import")]
+    Import,
+    #[token("as")]
+    As,
+    #[token("do")]
+    Do,
+    #[token("use_env")]
+    UseEnv,
 
     // Comments
     #[regex(r"//.*")]
@@ -150,11 +171,11 @@ pub enum Token<'a> {
     #[regex("[ \r\n\t]+")]
     Space(&'a str),
 
-    EOF,
     Error,
 }
 
 impl TokenKind {
+    #[inline]
     pub fn len(&self) -> Option<usize> {
         match &self {
             TokenKind::Range => Some(2),
@@ -185,7 +206,7 @@ impl TokenKind {
             TokenKind::RightBracket => Some(1),
             TokenKind::LeftBrace => Some(1),
             TokenKind::RightBrace => Some(1),
-            TokenKind::Assign => Some(1),
+            TokenKind::Assignment => Some(1),
             TokenKind::Arrow => Some(2),
             TokenKind::Let => Some(3),
             TokenKind::If => Some(2),
@@ -199,38 +220,154 @@ impl TokenKind {
             _ => None,
         }
     }
-}
 
-fn number<'a>(lex: &mut Lexer<'a, Token<'a>>) -> Number {
-    // 0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?
-    let text = lex.slice();
-    // Check if the string starts with 0, indicating it could be a hex, octal, or binary number
-    if text.starts_with("0") && text.len() > 1 {
-        match text.chars().nth(1).unwrap() {
-            'x' | 'X' => {
-                return Number::Integer(
-                    BigInt::from_str_radix(&text[2..], 16).expect("Invalid hexadecimal number"),
-                )
-            }
-            'o' | 'O' => {
-                return Number::Integer(
-                    BigInt::from_str_radix(&text[2..], 8).expect("Invalid octal number"),
-                )
-            }
-            'b' | 'B' => {
-                return Number::Integer(
-                    BigInt::from_str_radix(&text[2..], 2).expect("Invalid binary number"),
-                )
-            }
-            _ => {} // if the second character is not x, o, or b, fall through to parsing as float
-        };
+    pub fn kind_name(&self) -> &'static str {
+        match self {
+            TokenKind::Ident => "Identifier",
+            TokenKind::Number => "Number",
+            TokenKind::String => "String",
+            TokenKind::RawString => "RawString",
+            TokenKind::Label => "Label",
+            TokenKind::Boolean => "Boolean",
+            TokenKind::Range => "Range",
+            TokenKind::And => "And",
+            TokenKind::Or => "Or",
+            TokenKind::Equal => "Equal",
+            TokenKind::NotEqual => "NotEqual",
+            TokenKind::LessThan => "LessThan",
+            TokenKind::LessThanOrEqual => "LessThanOrEqual",
+            TokenKind::GreaterThan => "GreaterThan",
+            TokenKind::GreaterThanOrEqual => "GreaterThanOrEqual",
+            TokenKind::Coalesce => "Coalesce",
+            TokenKind::Divide => "Divide",
+            TokenKind::Modulo => "Modulo",
+            TokenKind::Power => "Power",
+            TokenKind::Pipe => "Pipe",
+            TokenKind::Caret => "Caret",
+            TokenKind::Plus => "Plus",
+            TokenKind::Minus => "Minus",
+            TokenKind::Star => "Star",
+            TokenKind::PlusPercent => "PlusPercent",
+            TokenKind::MinusPercent => "MinusPercent",
+            TokenKind::StarPercent => "StarPercent",
+            TokenKind::Exclamation => "Exclamation",
+            TokenKind::Question => "Question",
+            TokenKind::Dot => "Dot",
+            TokenKind::Comma => "Comma",
+            TokenKind::Colon => "Colon",
+            TokenKind::Semicolon => "Semicolon",
+            TokenKind::LeftParen => "LeftParen",
+            TokenKind::RightParen => "RightParen",
+            TokenKind::LeftBracket => "LeftBracket",
+            TokenKind::RightBracket => "RightBracket",
+            TokenKind::LeftBrace => "LeftBrace",
+            TokenKind::RightBrace => "RightBrace",
+            TokenKind::Assignment => "Assignment",
+            TokenKind::Arrow => "Arrow",
+            TokenKind::VerticalBar => "VerticalBar",
+            TokenKind::Ampersand => "Ampersand",
+            TokenKind::Let => "Let",
+            TokenKind::If => "If",
+            TokenKind::Else => "Else",
+            TokenKind::While => "While",
+            TokenKind::For => "For",
+            TokenKind::Loop => "Loop",
+            TokenKind::In => "In",
+            TokenKind::Break => "Break",
+            TokenKind::Continue => "Continue",
+            TokenKind::Return => "Return",
+            TokenKind::Struct => "Struct",
+            TokenKind::Enum => "Enum",
+            TokenKind::Impl => "Impl",
+            TokenKind::Trait => "Trait",
+            TokenKind::Mod => "Mod",
+            TokenKind::Type => "Type",
+            TokenKind::Fn => "Function",
+            TokenKind::Mut => "Mutable",
+            TokenKind::Import => "Import",
+            TokenKind::As => "As",
+            TokenKind::Do => "Do",
+            TokenKind::UseEnv => "UseEnv",
+            TokenKind::LineComment => "LineComment",
+            TokenKind::BlockComment => "BlockComment",
+            TokenKind::Space => "Space",
+            TokenKind::Error => "Error",
+        }
     }
-
-    // If not starting with 0x, 0o, or 0b, try parsing as float
-    Number::Float(f64::from_str(text).expect("Invalid float number"))
 }
+
+// fn number<'a>(lex: &mut Lexer<'a, Token<'a>>) -> Number {
+//     let text = lex.slice();
+//     let mut is_float = false;
+
+//     // Check for prefixed numbers: hex, octal, or binary
+//     if text.starts_with("0") && text.len() > 1 {
+//         match text.chars().nth(1).unwrap() {
+//             'x' | 'X' => {
+//                 return Number::Integer(
+//                     BigInt::from_str_radix(&text[2..], 16).expect("Invalid hexadecimal number"),
+//                 )
+//             }
+//             'o' | 'O' => {
+//                 return Number::Integer(
+//                     BigInt::from_str_radix(&text[2..], 8).expect("Invalid octal number"),
+//                 )
+//             }
+//             'b' | 'B' => {
+//                 return Number::Integer(
+//                     BigInt::from_str_radix(&text[2..], 2).expect("Invalid binary number"),
+//                 )
+//             }
+//             _ => {}
+//         }
+//     }
+
+//     // Manually parse the number to determine if it's an integer or float
+//     for (i, c) in text.chars().enumerate() {
+//         match c {
+//             '0'..='9' => continue, // Digits are fine
+//             '.' => {
+//                 // Only one decimal point allowed
+//                 if is_float {
+//                     panic!("Invalid float number: multiple decimal points");
+//                 }
+//                 is_float = true;
+//             }
+//             'e' | 'E' => {
+//                 // Handle scientific notation; if encountered, the rest must be float
+//                 is_float = true;
+//                 // Check if the exponent is properly formatted
+//                 if i + 1 < text.len() {
+//                     match text.chars().nth(i + 1).unwrap() {
+//                         '+' | '-' => {
+//                             // Skip sign, must be followed by digits
+//                             if i + 2 >= text.len() || !text.chars().nth(i + 2).unwrap().is_digit(10)
+//                             {
+//                                 panic!("Invalid float number: malformed exponent");
+//                             }
+//                         }
+//                         d if d.is_digit(10) => continue,
+//                         _ => panic!("Invalid float number: malformed exponent"),
+//                     }
+//                 } else {
+//                     panic!("Invalid float number: missing exponent digits");
+//                 }
+//                 break; // Rest must be digits
+//             }
+//             _ => panic!("Invalid character in number: '{}'", c), // Non-numeric characters
+//         }
+//     }
+
+//     // Return the parsed number
+//     if is_float {
+//         Number::Float(f64::from_str(text).expect("Invalid float number"))
+//     } else {
+//         Number::Integer(BigInt::from_str(text).expect("Invalid integer number"))
+//     }
+// }
 
 impl<'a> Token<'a> {
+    #[inline]
     pub fn kind(&self) -> TokenKind {
         TokenKind::from(self)
     }

@@ -1,0 +1,18 @@
+[package]
+name = "scripts"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+parser = { path = "../parser" }
+num = "0.4.3"
+fst = { path = "../fst" }
+enumset = { version = "1.1.5", features = ["std", "alloc"] }
+twox-hash = "2.0.0"
+
+
+[features]
+parser_log = ["parser/log"]

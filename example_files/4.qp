@@ -1,14 +1,12 @@
 fn test() { 
-    // example of currying
-    let add = |a, b| a + b;
-    let add_one = add>3+2<;
-    assert_eq!(add_one(2), 3);
+    let add = (a, b) -> a + b;
+    assert_eq!(add(2, 3), 5);
 }
 
 fn test2 {
     // named arguments
-    let add = |a, b| a + b;
-    assert_eq!(add{
+    let add = (a, b) -> a + b;
+    assert_eq!(add {
         a: 3,
         b: 2,
     }, 5);

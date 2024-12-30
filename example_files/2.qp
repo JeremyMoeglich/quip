@@ -1,4 +1,4 @@
-import std.env.console.{input, println, console};
+import std as env.console.{input, println, console};
 env console;
 
 let v1: f64 = input("Enter a number (1): ").parse();
@@ -6,4 +6,4 @@ let v2: f64 = input("Enter a number (2): ").parse();
 
 let result = v1 + v2;
 
-println(f"The result is: {result}");
+println("The result is: {result}");

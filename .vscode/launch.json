@@ -135,6 +135,24 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug binary 'stress' in package 'scripts'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=stress",
+                    "--package=scripts"
+                ],
+                "filter": {
+                    "name": "stress",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

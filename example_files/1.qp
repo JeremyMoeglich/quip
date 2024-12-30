@@ -1,21 +1,2 @@
-let x = 1;
-let y = 2;
-let mut z = 3;
-
-let p = {
-        let a = 1;
-        let b = 2;
-        let c = 3;
-        a + b + c
-    };
-
-    let t = [1, 2, 3, 4, 5];
-
-    z = 4;
-
-    println("x = {x}, y = {y}, z = {z}");
-    println("p = {p}, t = {t}");
-
-test();
-
+let x = 
 

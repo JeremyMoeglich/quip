@@ -1,4 +1,4 @@
-import ./lib.docref;
+import lib.docref;
 
 pub let name = "Hello World!";
 pub let next = [
